@@ -2,9 +2,9 @@ use axerrno::{AxError, AxResult};
 use axvcpu::{AccessWidth, AxVCpuExitReason};
 
 use crate::exception_utils::*;
-use crate::ContextFrame;
+use crate::TrapFrame;
 
-pub fn data_abort_handler(context_frame: &mut ContextFrame) -> AxResult<AxVCpuExitReason> {
+pub fn data_abort_handler(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
     let address = exception_fault_addr()?;
     debug!(
         "data fault addr {:?}, esr: 0x{:x}",

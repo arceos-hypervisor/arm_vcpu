@@ -213,6 +213,7 @@ pub fn exception_data_abort_access_reg() -> usize {
 ///
 /// # Returns
 /// The width of the register in bytes (4 or 8 bytes).
+#[allow(unused)]
 #[inline(always)]
 pub fn exception_data_abort_access_reg_width() -> usize {
     4 + 4 * ((exception_iss() >> 15) & 1)
@@ -223,6 +224,7 @@ pub fn exception_data_abort_access_reg_width() -> usize {
 /// # Returns
 /// - `true` if the data is sign-extended.
 /// - `false` otherwise.
+#[allow(unused)]
 #[inline(always)]
 pub fn exception_data_abort_access_is_sign_ext() -> bool {
     ((exception_iss() >> 21) & 1) != 0

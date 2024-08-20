@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-spin = "0.9"
 log = "0.4.19"
 
 cortex-a = "8.1.1"
@@ -13,7 +12,7 @@ smccc = "0.1.1"
 tock-registers = "0.8"
 
 axerrno = "0.1.0"
+percpu = "0.1.4"
 
-axhal = { git = "https://github.com/arceos-hypervisor/arceos.git", rev = "5c9ee79", features = ["hv"] }
-axaddrspace = { git = "https://github.com/arceos-hypervisor/axaddrspace.git", rev = "17378d" }
-axvcpu = { git = "https://github.com/arceos-hypervisor/axvcpu.git" }
+axaddrspace = { git = "https://github.com/arceos-hypervisor/axaddrspace.git" }
+axvcpu = { git = "https://github.com/arceos-hypervisor/axvcpu.git", rev = "6b374a5" }

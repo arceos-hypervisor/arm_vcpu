@@ -1,5 +1,7 @@
 #![no_std]
 #![feature(naked_functions)]
+#![feature(doc_cfg)]
+#![doc = include_str!("../README.md")]
 
 #[macro_use]
 extern crate log;
@@ -11,34 +13,20 @@ mod pcpu;
 mod sync;
 mod vcpu;
 
-use spin::once::Once;
-
-use axerrno::AxResult;
-use axhal::arch::register_lower_aarch64_synchronous_handler;
-
 pub use self::pcpu::Aarch64PerCpu;
 pub use self::vcpu::Aarch64VCpu;
 pub use vcpu::AxArchVCpuConfig;
 
 /// context frame for aarch64
-pub type ContextFrame = context_frame::Aarch64ContextFrame;
+pub type TrapFrame = context_frame::Aarch64ContextFrame;
 
+/// Return if current platform support virtualization extension.
 pub fn has_hardware_support() -> bool {
+    // Hint:
+    // In Cortex-A78, we can use
+    // [ID_AA64MMFR1_EL1](https://developer.arm.com/documentation/101430/0102/Register-descriptions/AArch64-system-registers/ID-AA64MMFR1-EL1--AArch64-Memory-Model-Feature-Register-1--EL1)
+    // to get whether Virtualization Host Extensions is supported.
+
+    // Current just return true by default.
     true
-}
-
-static INIT: Once = Once::new();
-
-pub fn do_register_lower_aarch64_synchronous_handler() -> AxResult {
-    unsafe {
-        INIT.call_once(|| {
-            register_lower_aarch64_synchronous_handler(self::vcpu::vmexit_aarch64_handler)
-        });
-    }
-    return Ok(());
-}
-
-pub fn do_register_lower_aarch64_irq_handler() -> AxResult {
-    // TODO
-    Ok(())
 }

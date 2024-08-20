@@ -12,8 +12,8 @@ use crate::exception_utils::{
     exception_class, exception_class_value, exception_esr, exception_fault_addr,
 };
 use crate::sync::data_abort_handler;
-use crate::ContextFrame;
-use crate::{do_register_lower_aarch64_irq_handler, do_register_lower_aarch64_synchronous_handler};
+use crate::TrapFrame;
+// use crate::{do_register_lower_aarch64_irq_handler, do_register_lower_aarch64_synchronous_handler};
 
 core::arch::global_asm!(include_str!("entry.S"));
 
@@ -23,7 +23,7 @@ core::arch::global_asm!(include_str!("entry.S"));
 #[derive(Clone, Debug, Copy, Default)]
 pub struct VmCpuRegisters {
     /// guest trap context
-    pub trap_context_regs: ContextFrame,
+    pub trap_context_regs: TrapFrame,
     /// virtual machine system regs setting
     pub vm_system_regs: VmContext,
 }
@@ -32,7 +32,7 @@ impl VmCpuRegisters {
     /// create a default VmCpuRegisters
     pub fn default() -> VmCpuRegisters {
         VmCpuRegisters {
-            trap_context_regs: ContextFrame::default(),
+            trap_context_regs: TrapFrame::default(),
             vm_system_regs: VmContext::default(),
         }
     }
@@ -43,12 +43,13 @@ impl VmCpuRegisters {
 pub struct Aarch64VCpu {
     // DO NOT modify `guest_regs` and `host_stack_top` and their order unless you do know what you are doing!
     // DO NOT add anything before or between them unless you do know what you are doing!
-    ctx: ContextFrame,
+    ctx: TrapFrame,
     host_stack_top: u64,
     system_regs: VmContext,
     vcpu_id: usize,
 }
 
+/// Indicates the parameter type used for creating a vCPU, currently using `VmCpuRegisters` directly.
 pub type AxArchVCpuConfig = VmCpuRegisters;
 
 impl axvcpu::AxArchVCpu for Aarch64VCpu {
@@ -58,7 +59,7 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
 
     fn new(_config: Self::CreateConfig) -> AxResult<Self> {
         Ok(Self {
-            ctx: ContextFrame::default(),
+            ctx: TrapFrame::default(),
             host_stack_top: 0,
             system_regs: VmContext::default(),
             vcpu_id: 0, // need to pass a parameter!!!!
@@ -66,8 +67,8 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
     }
 
     fn setup(&mut self, _config: Self::SetupConfig) -> AxResult {
-        do_register_lower_aarch64_synchronous_handler()?;
-        do_register_lower_aarch64_irq_handler()?;
+        // do_register_lower_aarch64_synchronous_handler()?;
+        // do_register_lower_aarch64_irq_handler()?;
         self.init_hv();
         Ok(())
     }
@@ -150,10 +151,15 @@ impl Aarch64VCpu {
         match exception_class() {
             Some(ESR_EL2::EC::Value::DataAbortLowerEL) => return data_abort_handler(ctx),
             Some(ESR_EL2::EC::Value::HVC64) => {
+                // Currently not used.
+                let _hvc_arg_imm16 = ESR_EL2.read(ESR_EL2::ISS);
+                // We assume that guest VM triggers HVC through a `hvc #0`` instruction.
+                // And arm64 hcall implementation uses `x0` to specify the hcall number.
+                // ref: [Linux](https://github.com/torvalds/linux/blob/master/Documentation/virt/kvm/arm/hyp-abi.rst)
                 return Ok(AxVCpuExitReason::Hypercall {
-                    nr: ESR_EL2.read(ESR_EL2::ISS),
+                    nr: ctx.gpr[0],
                     args: [
-                        ctx.gpr[0], ctx.gpr[1], ctx.gpr[2], ctx.gpr[3], ctx.gpr[4], ctx.gpr[5],
+                        ctx.gpr[1], ctx.gpr[2], ctx.gpr[3], ctx.gpr[4], ctx.gpr[5], ctx.gpr[6],
                     ],
                 });
             }
@@ -218,17 +224,22 @@ impl Aarch64VCpu {
     }
 
     /// Get general purpose register
-    fn get_gpr(&mut self, idx: usize) {
+    #[allow(unused)]
+    fn get_gpr(&self, idx: usize) {
         self.ctx.gpr(idx);
     }
 
     /// Set general purpose register
+    #[allow(unused)]
     fn set_gpr(&mut self, idx: usize, val: usize) {
         self.ctx.set_gpr(idx, val);
     }
 }
 
+core::arch::global_asm!(include_str!("trap.S"));
+
 #[naked]
+#[no_mangle]
 pub unsafe extern "C" fn vmexit_aarch64_handler() {
     // save guest context
     core::arch::asm!(
@@ -240,4 +251,33 @@ pub unsafe extern "C" fn vmexit_aarch64_handler() {
         "ret",
         options(noreturn),
     )
+}
+
+#[repr(u8)]
+#[derive(Debug)]
+#[allow(dead_code)]
+enum TrapKind {
+    Synchronous = 0,
+    Irq = 1,
+    Fiq = 2,
+    SError = 3,
+}
+
+#[repr(u8)]
+#[derive(Debug)]
+#[allow(dead_code)]
+enum TrapSource {
+    CurrentSpEl0 = 0,
+    CurrentSpElx = 1,
+    LowerAArch64 = 2,
+    LowerAArch32 = 3,
+}
+
+/// deal with invalid aarch64 synchronous exception
+#[no_mangle]
+fn invalid_exception_el2(tf: &mut TrapFrame, kind: TrapKind, source: TrapSource) {
+    panic!(
+        "Invalid exception {:?} from {:?}:\n{:#x?}",
+        kind, source, tf
+    );
 }

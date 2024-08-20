@@ -15,6 +15,13 @@ pub struct Aarch64PerCpu {
     pub ctx: Option<usize>,
 }
 
+#[percpu::def_percpu]
+static ORI_EXCEPTION_VECTOR_BASE: usize = 0;
+
+extern "C" {
+    fn exception_vector_base_vcpu();
+}
+
 impl AxVMArchPerCpu for Aarch64PerCpu {
     fn new(cpu_id: usize) -> AxResult<Self> {
         Ok(Self { cpu_id, ctx: None })
@@ -26,10 +33,24 @@ impl AxVMArchPerCpu for Aarch64PerCpu {
     }
 
     fn hardware_enable(&mut self) -> AxResult {
+        // First we save origin `exception_vector_base`.
+        // Safety:
+        // Todo: take care of `preemption`
+        unsafe { ORI_EXCEPTION_VECTOR_BASE.write_current_raw(VBAR_EL2.get() as usize) }
+
+        // Set current `VBAR_EL2` to `exception_vector_base_vcpu`
+        // defined in this crate.
+        VBAR_EL2.set(exception_vector_base_vcpu as usize as _);
+
         Ok(HCR_EL2.set(HCR_EL2::VM::Enable.into()))
     }
 
     fn hardware_disable(&mut self) -> AxResult {
+        // Reset `VBAR_EL2` into previous value.
+        // Safety:
+        // Todo: take care of `preemption`
+        VBAR_EL2.set(unsafe { ORI_EXCEPTION_VECTOR_BASE.read_current_raw() } as _);
+
         Ok(HCR_EL2.set(HCR_EL2::VM::Disable.into()))
     }
 }
