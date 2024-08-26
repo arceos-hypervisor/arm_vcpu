@@ -1,5 +1,5 @@
 use aarch64_cpu::registers::{
-    Readable, CNTHCTL_EL2, ESR_EL2, HCR_EL2, SCTLR_EL1, SPSR_EL1, VTCR_EL2, VTTBR_EL2,
+     CNTHCTL_EL2,  HCR_EL2,  SPSR_EL1, VTCR_EL2
 };
 use tock_registers::interfaces::ReadWriteable;
 
@@ -8,10 +8,9 @@ use axerrno::AxResult;
 use axvcpu::AxVCpuExitReason;
 
 use crate::context_frame::VmContext;
-use crate::exception_utils::{
-    exception_class, exception_class_value, exception_esr, exception_fault_addr,
-};
-use crate::sync::data_abort_handler;
+use crate::exception_utils::exception_class_value;
+use crate::sync::exception_handle_sync;
+use crate::irq::exception_handle_irq;
 use crate::TrapFrame;
 // use crate::{do_register_lower_aarch64_irq_handler, do_register_lower_aarch64_synchronous_handler};
 
@@ -87,8 +86,8 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
 
     fn run(&mut self) -> AxResult<AxVCpuExitReason> {
         self.restore_vm_system_regs();
-        self.run_guest();
-        self.vmexit_handler()
+        let id: usize = self.run_guest();
+        self.vmexit_handler(id)
     }
 
     fn bind(&mut self) -> AxResult {
@@ -103,7 +102,8 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
 // Private function
 impl Aarch64VCpu {
     #[inline(never)]
-    fn run_guest(&mut self) {
+    fn run_guest(&mut self) -> usize {
+        let mut ret;
         unsafe {
             core::arch::asm!(
                 save_regs_to_stack!(),  // save host context
@@ -113,9 +113,11 @@ impl Aarch64VCpu {
                 "mov x0, {0}",
                 "b context_vm_entry",
                 in(reg) &self.host_stack_top as *const _ as usize,
+                out("x0") ret,
                 options(nostack)
             );
         }
+        ret
     }
 
     fn restore_vm_system_regs(&mut self) {
@@ -138,7 +140,7 @@ impl Aarch64VCpu {
         }
     }
 
-    fn vmexit_handler(&mut self) -> AxResult<AxVCpuExitReason> {
+    fn vmexit_handler(&mut self, id: usize) -> AxResult<AxVCpuExitReason> {
         trace!(
             "Aarch64VCpu vmexit_handler() esr:{:#x} ctx:{:#x?}",
             exception_class_value(),
@@ -148,35 +150,10 @@ impl Aarch64VCpu {
         self.system_regs.ext_regs_store();
 
         let ctx = &mut self.ctx;
-        match exception_class() {
-            Some(ESR_EL2::EC::Value::DataAbortLowerEL) => return data_abort_handler(ctx),
-            Some(ESR_EL2::EC::Value::HVC64) => {
-                // Currently not used.
-                let _hvc_arg_imm16 = ESR_EL2.read(ESR_EL2::ISS);
-                // We assume that guest VM triggers HVC through a `hvc #0`` instruction.
-                // And arm64 hcall implementation uses `x0` to specify the hcall number.
-                // ref: [Linux](https://github.com/torvalds/linux/blob/master/Documentation/virt/kvm/arm/hyp-abi.rst)
-                return Ok(AxVCpuExitReason::Hypercall {
-                    nr: ctx.gpr[0],
-                    args: [
-                        ctx.gpr[1], ctx.gpr[2], ctx.gpr[3], ctx.gpr[4], ctx.gpr[5], ctx.gpr[6],
-                    ],
-                });
-            }
-            _ => {
-                panic!(
-                    "handler not presents for EC_{} @ipa 0x{:x}, @pc 0x{:x}, @esr 0x{:x}, @sctlr_el1 0x{:x}, @vttbr_el2 0x{:x}, @vtcr_el2: {:#x} hcr: {:#x} ctx:{}",
-                    exception_class_value(),
-                    exception_fault_addr()?,
-                    (*ctx).exception_pc(),
-                    exception_esr(),
-                    SCTLR_EL1.get() as usize,
-                    VTTBR_EL2.get() as usize,
-                    VTCR_EL2.get() as usize,
-                    HCR_EL2.get() as usize,
-                    ctx
-                );
-            }
+        match id {
+            1 => return exception_handle_sync(ctx),
+            2 => return exception_handle_irq(ctx),
+            _ => panic!("undefined exception...")
         }
     }
 
