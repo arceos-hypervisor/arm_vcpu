@@ -11,6 +11,7 @@ mod context_frame;
 mod exception_utils;
 mod pcpu;
 mod sync;
+mod irq;
 mod vcpu;
 
 pub use self::pcpu::Aarch64PerCpu;

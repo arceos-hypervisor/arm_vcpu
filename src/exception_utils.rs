@@ -245,7 +245,7 @@ pub fn exception_data_abort_access_is_sign_ext() -> bool {
 macro_rules! save_regs_to_stack {
     () => {
         "
-        sub     sp, sp, 34 * 8
+        sub     sp, sp, 36 * 8
         stp     x0, x1, [sp]
         stp     x2, x3, [sp, 2 * 8]
         stp     x4, x5, [sp, 4 * 8]
@@ -268,8 +268,11 @@ macro_rules! save_regs_to_stack {
         mrs     x10, elr_el2
         mrs     x11, spsr_el2
         stp     x10, x11, [sp, 32 * 8]
-
-        add    sp, sp, 34 * 8"
+        mov     x0, 0xff  // no used
+        mov     x1, 0xff  // no used
+        stp     x0, x1, [sp, 34 * 8]
+        
+        add    sp, sp, 36 * 8"
     };
 }
 
@@ -286,7 +289,8 @@ macro_rules! save_regs_to_stack {
 macro_rules! restore_regs_from_stack {
     () => {
         "
-        sub     sp, sp, 34 * 8
+        sub     sp, sp, 36 * 8
+        str x0, [sp, #34 * 8]
 
         ldp     x10, x11, [sp, 32 * 8]
         msr     elr_el2, x10
@@ -309,6 +313,6 @@ macro_rules! restore_regs_from_stack {
         ldp     x2, x3, [sp, 2 * 8]
         ldp     x0, x1, [sp]
 
-        add     sp, sp, 34 * 8"
+        add     sp, sp, 36 * 8"
     };
 }
