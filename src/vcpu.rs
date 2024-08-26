@@ -87,7 +87,11 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
 
     fn run(&mut self) -> AxResult<AxVCpuExitReason> {
         self.restore_vm_system_regs();
-        self.run_guest();
+        match self.run_guest() {
+            123 => {}
+            456 => {}
+            _ => {}
+        }
         self.vmexit_handler()
     }
 
@@ -103,7 +107,8 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
 // Private function
 impl Aarch64VCpu {
     #[inline(never)]
-    fn run_guest(&mut self) {
+    fn run_guest(&mut self) -> usize {
+        let mut ret;
         unsafe {
             core::arch::asm!(
                 save_regs_to_stack!(),  // save host context
@@ -113,9 +118,11 @@ impl Aarch64VCpu {
                 "mov x0, {0}",
                 "b context_vm_entry",
                 in(reg) &self.host_stack_top as *const _ as usize,
+                out("x0") ret,
                 options(nostack)
-            );
+            )
         }
+        ret
     }
 
     fn restore_vm_system_regs(&mut self) {
