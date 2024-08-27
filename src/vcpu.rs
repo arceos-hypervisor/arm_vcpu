@@ -14,7 +14,6 @@ use crate::TrapFrame;
 const EXCEPTION_IRQ: usize = 1;
 const EXCEPTION_SYNC: usize = 2;
 
-
 core::arch::global_asm!(include_str!("entry.S"));
 
 /// (v)CPU register state that must be saved or restored when entering/exiting a VM or switching
@@ -213,7 +212,6 @@ impl Aarch64VCpu {
         self.ctx.set_gpr(idx, val);
     }
 }
-
 
 core::arch::global_asm!(
     include_str!("trap.S"),
