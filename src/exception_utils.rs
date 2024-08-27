@@ -230,23 +230,11 @@ pub fn exception_data_abort_access_is_sign_ext() -> bool {
     ((exception_iss() >> 21) & 1) != 0
 }
 
-/// Macro to save the general-purpose registers (GPRs) to the stack.
-///
-/// This macro generates assembly code that:
-/// - Subtracts the size of the register data from the stack pointer.
-/// - Stores all 31 general-purpose registers (x0 to x30) on the stack.
-/// - Saves the `elr_el2` and `spsr_el2` registers on the stack as well.
-/// - Adjusts the stack pointer after storing the registers.
-///
-/// The layout of the saved registers on the stack is:
-/// - Registers x0 to x29 at `sp` to `sp + 29 * 8`.
-/// - Registers x30 and the stack pointer at `sp + 30 * 8`.
-/// - Registers `elr_el2` and `spsr_el2` at `sp + 32 * 8`.
+/// Macro to save the host ctx to the stack.
 macro_rules! save_regs_to_stack {
     () => {
         "
         sub     sp, sp, 12 * 8
-        // save old context (callee-saved registers)
         stp     x29, x30, [sp, 10 * 8]
         stp     x27, x28, [sp, 8 * 8]
         stp     x25, x26, [sp, 6 * 8]
@@ -257,16 +245,7 @@ macro_rules! save_regs_to_stack {
     };
 }
 
-/// Macro to restore the general-purpose registers (GPRs) from the stack.
-///
-/// This macro generates assembly code that:
-/// - Subtracts the size of the register data from the stack pointer.
-/// - Restores all 31 general-purpose registers (x0 to x30) from the stack.
-/// - Loads the `elr_el2` and `spsr_el2` registers from the stack.
-/// - Adjusts the stack pointer after restoring the registers.
-///
-/// The layout of the restored registers on the stack matches the layout
-/// defined in `save_regs_to_stack!`.
+/// Macro to restore the host ctx from the stack.
 macro_rules! restore_regs_from_stack {
     () => {
         "

@@ -62,14 +62,14 @@
 .macro HANDLE_IRQ_VCPU
 .p2align 7
     SAVE_REGS_EL2
-    mov    x0, #2
+    mov    x0, {exception_irq}
     bl     vmexit_aarch64_handler
 .endm
 
 .macro HANDLE_LOWER_SYNC_VCPU
 .p2align 7
     SAVE_REGS_EL2
-    mov    x0, #1
+    mov    x0, {exception_sync}
     bl     vmexit_aarch64_handler
 .endm
 

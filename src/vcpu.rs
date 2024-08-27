@@ -11,6 +11,9 @@ use crate::irq::exception_handle_irq;
 use crate::sync::exception_handle_sync;
 use crate::TrapFrame;
 // use crate::{do_register_lower_aarch64_irq_handler, do_register_lower_aarch64_synchronous_handler};
+const EXCEPTION_IRQ: usize = 1;
+const EXCEPTION_SYNC: usize = 2;
+
 
 core::arch::global_asm!(include_str!("entry.S"));
 
@@ -84,8 +87,8 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
 
     fn run(&mut self) -> AxResult<AxVCpuExitReason> {
         self.restore_vm_system_regs();
-        let id: usize = self.run_guest();
-        self.vmexit_handler(id)
+        let exit_reason: usize = self.run_guest();
+        self.vmexit_handler(exit_reason)
     }
 
     fn bind(&mut self) -> AxResult {
@@ -138,7 +141,7 @@ impl Aarch64VCpu {
         }
     }
 
-    fn vmexit_handler(&mut self, id: usize) -> AxResult<AxVCpuExitReason> {
+    fn vmexit_handler(&mut self, exit_reason: usize) -> AxResult<AxVCpuExitReason> {
         trace!(
             "Aarch64VCpu vmexit_handler() esr:{:#x} ctx:{:#x?}",
             exception_class_value(),
@@ -148,9 +151,9 @@ impl Aarch64VCpu {
         self.system_regs.ext_regs_store();
 
         let ctx = &mut self.ctx;
-        match id {
-            1 => return exception_handle_sync(ctx),
-            2 => return exception_handle_irq(ctx),
+        match exit_reason {
+            EXCEPTION_SYNC => return exception_handle_sync(ctx),
+            EXCEPTION_IRQ => return exception_handle_irq(ctx),
             _ => panic!("undefined exception..."),
         }
     }
@@ -211,7 +214,12 @@ impl Aarch64VCpu {
     }
 }
 
-core::arch::global_asm!(include_str!("trap.S"));
+
+core::arch::global_asm!(
+    include_str!("trap.S"),
+    exception_irq = const EXCEPTION_IRQ,
+    exception_sync = const EXCEPTION_SYNC,
+);
 
 #[naked]
 #[no_mangle]
