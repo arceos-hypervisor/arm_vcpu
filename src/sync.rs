@@ -3,9 +3,7 @@ use axvcpu::{AccessWidth, AxVCpuExitReason};
 
 use crate::exception_utils::*;
 use crate::TrapFrame;
-use aarch64_cpu::registers::{
-    Readable, ESR_EL2, HCR_EL2, SCTLR_EL1, VTCR_EL2, VTTBR_EL2,
-};
+use aarch64_cpu::registers::{Readable, ESR_EL2, HCR_EL2, SCTLR_EL1, VTCR_EL2, VTTBR_EL2};
 
 pub fn exception_handle_sync(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
     match exception_class() {

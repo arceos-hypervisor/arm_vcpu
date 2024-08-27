@@ -9,9 +9,9 @@ extern crate log;
 mod context_frame;
 #[macro_use]
 mod exception_utils;
+mod irq;
 mod pcpu;
 mod sync;
-mod irq;
 mod vcpu;
 
 pub use self::pcpu::Aarch64PerCpu;

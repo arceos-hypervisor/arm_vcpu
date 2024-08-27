@@ -1,6 +1,4 @@
-use aarch64_cpu::registers::{
-     CNTHCTL_EL2,  HCR_EL2,  SPSR_EL1, VTCR_EL2
-};
+use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SPSR_EL1, VTCR_EL2};
 use tock_registers::interfaces::ReadWriteable;
 
 use axaddrspace::{GuestPhysAddr, HostPhysAddr};
@@ -9,8 +7,8 @@ use axvcpu::AxVCpuExitReason;
 
 use crate::context_frame::VmContext;
 use crate::exception_utils::exception_class_value;
-use crate::sync::exception_handle_sync;
 use crate::irq::exception_handle_irq;
+use crate::sync::exception_handle_sync;
 use crate::TrapFrame;
 // use crate::{do_register_lower_aarch64_irq_handler, do_register_lower_aarch64_synchronous_handler};
 
@@ -153,7 +151,7 @@ impl Aarch64VCpu {
         match id {
             1 => return exception_handle_sync(ctx),
             2 => return exception_handle_irq(ctx),
-            _ => panic!("undefined exception...")
+            _ => panic!("undefined exception..."),
         }
     }
 
