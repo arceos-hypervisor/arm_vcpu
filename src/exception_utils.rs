@@ -230,7 +230,17 @@ pub fn exception_data_abort_access_is_sign_ext() -> bool {
     ((exception_iss() >> 21) & 1) != 0
 }
 
-/// Macro to save the host ctx to the stack.
+/// Macro to save the host function context to the stack.
+///
+/// This macro saves the values of the callee-saved registers (`x19` to `x30`) to the stack.
+/// The stack pointer (`sp`) is adjusted accordingly
+/// to make space for the saved registers.
+///
+/// ## Note
+///
+/// This macro should be used in conjunction with `restore_regs_from_stack!` to ensure that
+/// the saved registers are properly restored when needed,
+/// and the control flow can be returned to `Aarch64VCpu.run()` in `vcpu.rs` happily.
 macro_rules! save_regs_to_stack {
     () => {
         "
@@ -240,16 +250,22 @@ macro_rules! save_regs_to_stack {
         stp     x25, x26, [sp, 6 * 8]
         stp     x23, x24, [sp, 4 * 8]
         stp     x21, x22, [sp, 2 * 8]
-        stp     x19, x20, [sp]
-        add    sp, sp, 12 * 8"
+        stp     x19, x20, [sp]"
     };
 }
 
-/// Macro to restore the host ctx from the stack.
+/// Macro to restore the host function context from the stack.
+///
+/// This macro restores the values of the callee-saved general-purpose registers (`x19` to `x30`) from the stack.
+/// The stack pointer (`sp`) is adjusted back after restoring the registers.
+///
+/// ## Note
+///
+/// This macro is called in `vmexit_trampoline()` in exception.rs,
+/// it should only be used after `save_regs_to_stack!` to correctly restore the control flow of `Aarch64VCpu.run()`.
 macro_rules! restore_regs_from_stack {
     () => {
         "
-        sub     sp, sp, 12 * 8
         ldp     x19, x20, [sp]
         ldp     x21, x22, [sp, 2 * 8]
         ldp     x23, x24, [sp, 4 * 8]

@@ -6,19 +6,11 @@ use axerrno::AxResult;
 use axvcpu::AxVCpuExitReason;
 
 use crate::context_frame::VmContext;
+use crate::exception::{handle_exception_irq, handle_exception_sync, TrapKind};
 use crate::exception_utils::exception_class_value;
-use crate::irq::handle_exception_irq;
-use crate::sync::handle_exception_sync;
 use crate::TrapFrame;
-const EXCEPTION_IRQ: usize = 1;
-const EXCEPTION_SYNC: usize = 2;
 
 core::arch::global_asm!(include_str!("entry.S"));
-core::arch::global_asm!(
-    include_str!("exception.S"),
-    exception_irq = const EXCEPTION_IRQ,
-    exception_sync = const EXCEPTION_SYNC,
-);
 
 /// (v)CPU register state that must be saved or restored when entering/exiting a VM or switching
 /// between VMs.
@@ -42,6 +34,7 @@ impl VmCpuRegisters {
 }
 
 /// A virtual CPU within a guest
+#[repr(C)]
 #[derive(Clone, Debug)]
 pub struct Aarch64VCpu {
     // DO NOT modify `guest_regs` and `host_stack_top` and their order unless you do know what you are doing!
@@ -90,7 +83,7 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
 
     fn run(&mut self) -> AxResult<AxVCpuExitReason> {
         self.restore_vm_system_regs();
-        let exit_reason: usize = self.run_guest();
+        let exit_reason = TrapKind::try_from(self.run_guest() as u8).expect("Invalid TrapKind");
         self.vmexit_handler(exit_reason)
     }
 
@@ -110,10 +103,10 @@ impl Aarch64VCpu {
         let mut ret;
         unsafe {
             core::arch::asm!(
-                save_regs_to_stack!(),  // save host context
+                save_regs_to_stack!(),  // Save host context.
                 "mov x9, sp",
                 "mov x10, {0}",
-                "str x9, [x10]",    // save host stack top in the vcpu struct
+                "str x9, [x10]",    // Save current host stack top in the `Aarch64VCpu` struct.
                 "mov x0, {0}",
                 "b context_vm_entry",
                 in(reg) &self.host_stack_top as *const _ as usize,
@@ -144,7 +137,7 @@ impl Aarch64VCpu {
         }
     }
 
-    fn vmexit_handler(&mut self, exit_reason: usize) -> AxResult<AxVCpuExitReason> {
+    fn vmexit_handler(&mut self, exit_reason: TrapKind) -> AxResult<AxVCpuExitReason> {
         trace!(
             "Aarch64VCpu vmexit_handler() esr:{:#x} ctx:{:#x?}",
             exception_class_value(),
@@ -155,9 +148,9 @@ impl Aarch64VCpu {
 
         let ctx = &mut self.ctx;
         match exit_reason {
-            EXCEPTION_SYNC => return handle_exception_sync(ctx),
-            EXCEPTION_IRQ => return handle_exception_irq(ctx),
-            _ => panic!("undefined exception..."),
+            TrapKind::Synchronous => handle_exception_sync(ctx),
+            TrapKind::Irq => handle_exception_irq(ctx),
+            _ => panic!("Unhandled exception {:?}", exit_reason),
         }
     }
 
@@ -215,48 +208,4 @@ impl Aarch64VCpu {
     fn set_gpr(&mut self, idx: usize, val: usize) {
         self.ctx.set_gpr(idx, val);
     }
-}
-
-#[naked]
-#[no_mangle]
-pub unsafe extern "C" fn vmexit_aarch64_handler() {
-    // save guest context
-    core::arch::asm!(
-        "add sp, sp, 34 * 8", // skip the exception frame
-        "mov x9, sp",
-        "ldr x10, [x9]",
-        "mov sp, x10",              // move sp to the host stack top value
-        restore_regs_from_stack!(), // restore host context
-        "ret",
-        options(noreturn),
-    )
-}
-
-#[repr(u8)]
-#[derive(Debug)]
-#[allow(dead_code)]
-enum TrapKind {
-    Synchronous = 0,
-    Irq = 1,
-    Fiq = 2,
-    SError = 3,
-}
-
-#[repr(u8)]
-#[derive(Debug)]
-#[allow(dead_code)]
-enum TrapSource {
-    CurrentSpEl0 = 0,
-    CurrentSpElx = 1,
-    LowerAArch64 = 2,
-    LowerAArch32 = 3,
-}
-
-/// deal with invalid aarch64 synchronous exception
-#[no_mangle]
-fn invalid_exception_el2(tf: &mut TrapFrame, kind: TrapKind, source: TrapSource) {
-    panic!(
-        "Invalid exception {:?} from {:?}:\n{:#x?}",
-        kind, source, tf
-    );
 }
