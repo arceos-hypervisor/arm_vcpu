@@ -5,7 +5,7 @@ use crate::exception_utils::*;
 use crate::TrapFrame;
 use aarch64_cpu::registers::{Readable, ESR_EL2, HCR_EL2, SCTLR_EL1, VTCR_EL2, VTTBR_EL2};
 
-pub fn exception_handle_sync(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
+pub fn handle_exception_sync(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
     match exception_class() {
         Some(ESR_EL2::EC::Value::DataAbortLowerEL) => return data_abort_handler(ctx),
         Some(ESR_EL2::EC::Value::HVC64) => {

@@ -7,14 +7,18 @@ use axvcpu::AxVCpuExitReason;
 
 use crate::context_frame::VmContext;
 use crate::exception_utils::exception_class_value;
-use crate::irq::exception_handle_irq;
-use crate::sync::exception_handle_sync;
+use crate::irq::handle_exception_irq;
+use crate::sync::handle_exception_sync;
 use crate::TrapFrame;
-// use crate::{do_register_lower_aarch64_irq_handler, do_register_lower_aarch64_synchronous_handler};
 const EXCEPTION_IRQ: usize = 1;
 const EXCEPTION_SYNC: usize = 2;
 
 core::arch::global_asm!(include_str!("entry.S"));
+core::arch::global_asm!(
+    include_str!("exception.S"),
+    exception_irq = const EXCEPTION_IRQ,
+    exception_sync = const EXCEPTION_SYNC,
+);
 
 /// (v)CPU register state that must be saved or restored when entering/exiting a VM or switching
 /// between VMs.
@@ -151,8 +155,8 @@ impl Aarch64VCpu {
 
         let ctx = &mut self.ctx;
         match exit_reason {
-            EXCEPTION_SYNC => return exception_handle_sync(ctx),
-            EXCEPTION_IRQ => return exception_handle_irq(ctx),
+            EXCEPTION_SYNC => return handle_exception_sync(ctx),
+            EXCEPTION_IRQ => return handle_exception_irq(ctx),
             _ => panic!("undefined exception..."),
         }
     }
@@ -212,12 +216,6 @@ impl Aarch64VCpu {
         self.ctx.set_gpr(idx, val);
     }
 }
-
-core::arch::global_asm!(
-    include_str!("trap.S"),
-    exception_irq = const EXCEPTION_IRQ,
-    exception_sync = const EXCEPTION_SYNC,
-);
 
 #[naked]
 #[no_mangle]
