@@ -6,7 +6,7 @@ use axvcpu::{AccessWidth, AxVCpuExitReason};
 use crate::exception_utils::{
     exception_class, exception_class_value, exception_data_abort_access_is_write,
     exception_data_abort_access_reg, exception_data_abort_access_width, exception_esr,
-    exception_fault_addr, exception_next_instruction_step,
+    exception_fault_addr, exception_next_instruction_step,exception_data_abort_access_reg_width,exception_data_abort_handleable,exception_data_abort_is_translate_fault,exception_data_abort_is_permission_fault
 };
 use crate::TrapFrame;
 
@@ -174,7 +174,7 @@ fn handle_data_abort(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason
         return Ok(AxVCpuExitReason::MmioWrite {
             addr,
             width,
-            data: context_frame.gpr(reg) as usize,
+            data: context_frame.gpr(reg) as u64,
         });
     }
     Ok(AxVCpuExitReason::MmioRead {
