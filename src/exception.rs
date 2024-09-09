@@ -193,12 +193,12 @@ fn handle_data_abort(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason
 }
 
 /// Handles HVC exceptions that serve as psci (Power State Coordination Interface) calls.
-/// 
+///
 /// Returns `None` if the HVC is not a psci call.
 fn handle_psci_hvc(ctx: &mut TrapFrame) -> Option<AxResult<AxVCpuExitReason>> {
     const PSCI_FN_RANGE_32: core::ops::RangeInclusive<u64> = 0x8400_0000..=0x8400_001F;
     const PSCI_FN_RANGE_64: core::ops::RangeInclusive<u64> = 0xC400_0000..=0xC400_001F;
-    
+
     const PSCI_FN_SYSTEM_OFF: u64 = 0x8;
 
     let fn_ = ctx.gpr[0];
@@ -210,11 +210,9 @@ fn handle_psci_hvc(ctx: &mut TrapFrame) -> Option<AxResult<AxVCpuExitReason>> {
         None
     };
 
-    fn_offset.map(|fn_offset| {
-        match fn_offset {
-            PSCI_FN_SYSTEM_OFF => Ok(AxVCpuExitReason::SystemDown),
-            _ => Err(AxError::Unsupported),
-        }
+    fn_offset.map(|fn_offset| match fn_offset {
+        PSCI_FN_SYSTEM_OFF => Ok(AxVCpuExitReason::SystemDown),
+        _ => Err(AxError::Unsupported),
     })
 }
 
