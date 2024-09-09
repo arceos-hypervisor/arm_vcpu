@@ -104,7 +104,10 @@ pub fn handle_exception_sync(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> 
             let _hvc_arg_imm16 = ESR_EL2.read(ESR_EL2::ISS);
 
             // Is this a psci call?
-            if let Some(result) = handle_psci_hvc(ctx) {
+            //
+            // By convention, a psci call can use either the `hvc` or the `smc` instruction.
+            // NimbOS uses `hvc`, `ArceOS` use `hvc` too when running on QEMU.
+            if let Some(result) = handle_psci_call(ctx) {
                 return result;
             }
 
@@ -192,10 +195,14 @@ fn handle_data_abort(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason
     })
 }
 
-/// Handles HVC exceptions that serve as psci (Power State Coordination Interface) calls.
+/// Handles HVC or SMC exceptions that serve as psci (Power State Coordination Interface) calls.
+///
+/// A hvc or smc call with the function in range 0x8000_0000..=0x8000_001F  (when the 32-bit
+/// hvc/smc calling convention is used) or 0xC000_0000..=0xC000_001F (when the 64-bit hvc/smc
+/// calling convention is used) is a psci call. This function handles them all.
 ///
 /// Returns `None` if the HVC is not a psci call.
-fn handle_psci_hvc(ctx: &mut TrapFrame) -> Option<AxResult<AxVCpuExitReason>> {
+fn handle_psci_call(ctx: &mut TrapFrame) -> Option<AxResult<AxVCpuExitReason>> {
     const PSCI_FN_RANGE_32: core::ops::RangeInclusive<u64> = 0x8400_0000..=0x8400_001F;
     const PSCI_FN_RANGE_64: core::ops::RangeInclusive<u64> = 0xC400_0000..=0xC400_001F;
 
