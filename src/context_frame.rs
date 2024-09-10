@@ -18,7 +18,7 @@ pub struct Aarch64ContextFrame {
     /// An array of 31 `u64` values representing the general-purpose registers.
     pub gpr: [u64; 31],
     /// The stack pointer of EL0, i.e., the `sp_el0` register.
-    /// 
+    ///
     /// Even though the stack pointer is automatically saved into and restored from `sp_el0` by the hardware,
     /// several OSes and hypervisors utilize this register as a thread-local storage pointer (to store the
     /// pointer to `current_task` generally), which requires the stack pointer to be saved and restored
