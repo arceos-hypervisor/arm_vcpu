@@ -1,5 +1,5 @@
-use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SPSR_EL1, VTCR_EL2};
-use tock_registers::interfaces::ReadWriteable;
+use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SPSR_EL1, SP_EL0, VTCR_EL2};
+use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 
 use axaddrspace::{GuestPhysAddr, HostPhysAddr};
 use axerrno::AxResult;
@@ -11,6 +11,17 @@ use crate::exception_utils::exception_class_value;
 use crate::TrapFrame;
 
 core::arch::global_asm!(include_str!("entry.S"));
+
+#[percpu::def_percpu]
+static HOST_SP_EL0: u64 = 0;
+
+fn save_host_sp_el0() {
+    unsafe { HOST_SP_EL0.write_current_raw(SP_EL0.get()) }
+}
+
+fn restore_host_sp_el0() {
+    SP_EL0.set(unsafe { HOST_SP_EL0.read_current_raw() });
+}
 
 /// (v)CPU register state that must be saved or restored when entering/exiting a VM or switching
 /// between VMs.
@@ -82,6 +93,9 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
     }
 
     fn run(&mut self) -> AxResult<AxVCpuExitReason> {
+        // Save host SP_EL0 to the ctx becase it's used as current task ptr.
+        // This has to be done before vm system regs are restored.
+        save_host_sp_el0();
         self.restore_vm_system_regs();
         let exit_reason = TrapKind::try_from(self.run_guest() as u8).expect("Invalid TrapKind");
         self.vmexit_handler(exit_reason)
@@ -147,8 +161,10 @@ impl Aarch64VCpu {
             exception_class_value(),
             self.ctx
         );
-        // restore system regs
+        // store system regs
         self.system_regs.ext_regs_store();
+        // restore host SP_EL0.
+        restore_host_sp_el0();
 
         let ctx = &mut self.ctx;
         match exit_reason {
