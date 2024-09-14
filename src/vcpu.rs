@@ -97,7 +97,8 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
         // This has to be done before vm system regs are restored.
         save_host_sp_el0();
         self.restore_vm_system_regs();
-        let exit_reason = TrapKind::try_from(self.run_guest() as u8).expect("Invalid TrapKind");
+        let exit_reason =
+            TrapKind::try_from(unsafe { self.run_guest() } as u8).expect("Invalid TrapKind");
         self.vmexit_handler(exit_reason)
     }
 
@@ -117,20 +118,20 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
 // Private function
 impl Aarch64VCpu {
     #[inline(never)]
-    fn run_guest(&mut self) -> usize {
-        unsafe {
-            core::arch::asm!(
-                save_regs_to_stack!(),  // Save host context.
-                "mov x9, sp",
-                "mov x10, x11",
-                "str x9, [x10]",    // Save current host stack top in the `Aarch64VCpu` struct.
-                "mov x0, x11",
-                "b context_vm_entry",
-                // in(reg) here is dangerous, because the compiler may use the register we want to use, creating a conflict.
-                in("x11") &self.host_stack_top as *const _ as usize,
-                options(nostack)
-            );
-        }
+    unsafe fn run_guest(&mut self) -> usize {
+        // Save function call context.
+        core::arch::asm!(
+            save_regs_to_stack!(),  // Save host context.
+            "mov x9, sp",
+            "mov x10, x11",
+            "str x9, [x10]",    // Save current host stack top in the `Aarch64VCpu` struct.
+            "mov x0, x11",
+            "b context_vm_entry",
+            // in(reg) here is dangerous, because the compiler may use the register we want to use, creating a conflict.
+            in("x11") &self.host_stack_top as *const _ as usize,
+            options(nostack)
+        );
+
         // the dummy return value, the real return value is in x0 when `vmexit_trampoline` returns
         0
     }
@@ -164,6 +165,7 @@ impl Aarch64VCpu {
         // store system regs
         self.system_regs.ext_regs_store();
         // restore host SP_EL0.
+        // This has to be done after guest's SP_EL0 is stored by `ext_regs_store`.
         restore_host_sp_el0();
 
         let ctx = &mut self.ctx;
