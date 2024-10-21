@@ -1,4 +1,4 @@
-use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SPSR_EL1, SP_EL0, VTCR_EL2};
+use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, MPIDR_EL1, SPSR_EL1, SP_EL0, VTCR_EL2};
 use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 
 use axaddrspace::{GuestPhysAddr, HostPhysAddr};
@@ -56,12 +56,12 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
 
     type SetupConfig = ();
 
-    fn new(_config: Self::CreateConfig) -> AxResult<Self> {
+    fn new(id: usize, _config: Self::CreateConfig) -> AxResult<Self> {
         Ok(Self {
             ctx: TrapFrame::default(),
             host_stack_top: 0,
             guest_system_regs: GuestSystemRegisters::default(),
-            vcpu_id: 0, // need to pass a parameter!!!!
+            vcpu_id: id, // need to pass a parameter!!!!
         })
     }
 
@@ -83,6 +83,8 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
     }
 
     fn run(&mut self) -> AxResult<AxVCpuExitReason> {
+        debug!("Aarch64VCpu run(), Mpidr:{:#x}", MPIDR_EL1.get());
+
         // Run guest.
         let exit_reson = unsafe {
             // Save host SP_EL0 to the ctx becase it's used as current task ptr.
@@ -204,6 +206,9 @@ impl Aarch64VCpu {
 
         let mut vmpidr = 0;
         vmpidr |= 1 << 31;
+
+        // Mind cpu cluster here.
+
         vmpidr |= self.vcpu_id;
         self.guest_system_regs.vmpidr_el2 = vmpidr as u64;
     }
