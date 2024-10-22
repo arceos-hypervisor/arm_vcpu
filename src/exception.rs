@@ -224,7 +224,7 @@ fn handle_psci_call(ctx: &mut TrapFrame) -> Option<AxResult<AxVCpuExitReason>> {
     };
 
     fn_offset.map(|fn_offset| match fn_offset {
-        PSCI_FN_CPU_OFF => Ok(AxVCpuExitReason::CpuDown { state: ctx.gpr[1] }),
+        PSCI_FN_CPU_OFF => Ok(AxVCpuExitReason::CpuDown { _state: ctx.gpr[1] }),
         PSCI_FN_CPU_ON => Ok(AxVCpuExitReason::CpuUp {
             target_cpu: ctx.gpr[1],
             entry_point: GuestPhysAddr::from(ctx.gpr[2] as usize),

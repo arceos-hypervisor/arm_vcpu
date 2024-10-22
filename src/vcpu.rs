@@ -207,8 +207,7 @@ impl Aarch64VCpu {
         let mut vmpidr = 0;
         vmpidr |= 1 << 31;
 
-        // Mind cpu cluster here.
-
+        // TODO: mind CPU cluster here.
         vmpidr |= self.vcpu_id;
         self.guest_system_regs.vmpidr_el2 = vmpidr as u64;
     }
