@@ -189,7 +189,7 @@ impl Aarch64VCpu {
 
     /// Init guest context. Also set some el2 register value.
     fn init_vm_context(&mut self) {
-        CNTHCTL_EL2.modify(CNTHCTL_EL2::EL1PCEN::SET + CNTHCTL_EL2::EL1PCTEN::SET);
+        CNTHCTL_EL2.modify(CNTHCTL_EL2::EL1PCEN::CLEAR + CNTHCTL_EL2::EL1PCTEN::CLEAR);
         self.guest_system_regs.cntvoff_el2 = 0;
         self.guest_system_regs.cntkctl_el1 = 0;
 

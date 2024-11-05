@@ -10,6 +10,7 @@ use crate::exception_utils::{
     exception_data_abort_access_width, exception_data_abort_handleable,
     exception_data_abort_is_permission_fault, exception_data_abort_is_translate_fault,
     exception_esr, exception_fault_addr, exception_next_instruction_step,
+    exception_sysreg_direction_write, exception_sysreg_gpr, sysreg_enc_addr,
 };
 use crate::TrapFrame;
 
@@ -123,6 +124,7 @@ pub fn handle_exception_sync(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> 
                 ],
             })
         }
+        Some(ESR_EL2::EC::Value::TrappedMsrMrs) => handle_system_register(ctx),
         _ => {
             panic!(
                 "handler not presents for EC_{} @ipa 0x{:x}, @pc 0x{:x}, @esr 0x{:x},
@@ -139,6 +141,50 @@ pub fn handle_exception_sync(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> 
             );
         }
     }
+}
+
+/*
+ESR EC:011000 IL, bit [25]：Instruction Length for synchronous exceptions. Possible values of this bit are: 0：16b 1：32b
+Op0, bits [21:20]
+Op2, bits [19:17]
+Op1, bits [16:14]
+CRn, bits [13:10]
+CRm, bits [4:1]   This five parameters are for SYSREG
+
+Rt, bits [9:5]  general-purpose register used for the transfer.
+Direction, bit [0]  0：Write access, including MSR instructions.  1：Read access, including MRS instructions.
+
+#define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
+
+#define SYS_CNTPCT_EL0			sys_reg(3, 3, 14, 0, 1)
+#define SYS_CNTPCTSS_EL0		sys_reg(3, 3, 14, 0, 5)
+#define SYS_CNTVCTSS_EL0		sys_reg(3, 3, 14, 0, 6)
+
+#define SYS_CNTP_TVAL_EL0		sys_reg(3, 3, 14, 2, 0)
+#define SYS_CNTP_CTL_EL0		sys_reg(3, 3, 14, 2, 1)
+#define SYS_CNTP_CVAL_EL0		sys_reg(3, 3, 14, 2, 2)
+
+#define SYS_CNTV_CTL_EL0		sys_reg(3, 3, 14, 3, 1)
+#define SYS_CNTV_CVAL_EL0		sys_reg(3, 3, 14, 3, 2)
+*/
+
+fn handle_system_register(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
+    let iss = ESR_EL2.read(ESR_EL2::ISS);
+    let addr = exception_sysreg_addr(iss.try_into().unwrap());
+    let elr = context_frame.exception_pc();
+    let val = elr + exception_next_instruction_step();
+    let write = exception_sysreg_direction_write(iss);
+    let reg = exception_sysreg_gpr(iss) as usize;
+    context_frame.set_exception_pc(val);
+    // TODO! gicv3 ICC_SRE_ADDR / ICC_SGIR_ADDR
+    if write {
+        return Ok(AxVCpuExitReason::SysregWrite {
+            addr,
+            reg,
+            data: context_frame.gpr(reg as usize) as u64,
+        });
+    }
+    Ok(AxVCpuExitReason::SysregRead { addr, reg })
 }
 
 fn handle_data_abort(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {

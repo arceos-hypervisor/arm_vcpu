@@ -171,6 +171,54 @@ pub fn exception_iss() -> usize {
     ESR_EL2.read(ESR_EL2::ISS) as usize
 }
 
+/// Generates a system register address encoding based on the given operands and control register numbers.
+/// This function uses bitwise operations to combine the parameters into a 32-bit address value.
+///
+/// # Arguments
+/// * `op0` - The first operand, must be in the range 0 to 3.
+/// * `op1` - The second operand, must be in the range 0 to 7.
+/// * `crn` - The control register number (CRn), must be in the range 0 to 15.
+/// * `crm` - The control register number (CRm), must be in the range 0 to 15.
+/// * `op2` - The third operand, must be in the range 0 to 7.
+///
+/// # Returns
+/// * A 32-bit address value representing the system register encoding.
+///
+/// # Example
+/// ```
+/// let addr = sysreg_enc_addr(1, 2, 3, 4, 5);
+/// assert_eq!(addr, 0x10000000 | (5 << 17) | (2 << 14) | (3 << 10) | (4 << 1));
+/// ```
+#[inline(always)]
+pub const fn sysreg_enc_addr(op0: usize, op1: usize, crn: usize, crm: usize, op2: usize) -> usize {
+    (((op0) & 0x3) << 20)
+        | (((op2) & 0x7) << 17)
+        | (((op1) & 0x7) << 14)
+        | (((crn) & 0xf) << 10)
+        | (((crm) & 0xf) << 1)
+}
+
+#[inline(always)]
+pub fn exception_sysreg_direction_write(iss: u64) -> bool {
+    const ESR_ISS_SYSREG_DIRECTION: u64 = 0b1;
+    (iss & ESR_ISS_SYSREG_DIRECTION) == 0
+}
+
+#[inline(always)]
+pub fn exception_sysreg_gpr(iss: u64) -> u64 {
+    const ESR_ISS_SYSREG_REG_OFF: u64 = 5;
+    const ESR_ISS_SYSREG_REG_LEN: u64 = 5;
+    const ESR_ISS_SYSREG_REG_MASK: u64 = (1 << ESR_ISS_SYSREG_REG_LEN) - 1;
+    (iss >> ESR_ISS_SYSREG_REG_OFF) & ESR_ISS_SYSREG_REG_MASK
+}
+
+#[inline(always)]
+const fn exception_sysreg_addr(iss: usize) -> usize {
+    // (Op0[21..20] + Op2[19..17] + Op1[16..14] + CRn[13..10]) + CRm[4..1]
+    const ESR_ISS_SYSREG_ADDR: usize = (0xfff << 10) | (0xf << 1);
+    iss & ESR_ISS_SYSREG_ADDR
+}
+
 /// Checks if the data abort exception was caused by a permission fault.
 ///
 /// # Returns
