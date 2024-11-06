@@ -9,7 +9,7 @@ use crate::exception_utils::{
     exception_data_abort_access_reg, exception_data_abort_access_reg_width,
     exception_data_abort_access_width, exception_data_abort_handleable,
     exception_data_abort_is_permission_fault, exception_data_abort_is_translate_fault,
-    exception_esr, exception_fault_addr, exception_next_instruction_step,
+    exception_esr, exception_fault_addr, exception_next_instruction_step, exception_sysreg_addr,
     exception_sysreg_direction_write, exception_sysreg_gpr, sysreg_enc_addr,
 };
 use crate::TrapFrame;

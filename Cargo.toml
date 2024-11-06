@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 log = "0.4.21"
+spin = "0.9"
 
 cortex-a = "8.1.1"
 aarch64-cpu = "9.3"
