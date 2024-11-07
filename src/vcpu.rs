@@ -1,9 +1,13 @@
+use core::marker::PhantomData;
+
 use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SPSR_EL1, SP_EL0, VTCR_EL2};
 use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 
 use axaddrspace::{GuestPhysAddr, HostPhysAddr};
 use axerrno::AxResult;
 use axvcpu::AxVCpuExitReason;
+
+use axvcpu::AxVCpuHal;
 
 use crate::context_frame::GuestSystemRegisters;
 use crate::exception::{handle_exception_irq, handle_exception_sync, TrapKind};
@@ -38,8 +42,8 @@ pub struct VmCpuRegisters {
 
 /// A virtual CPU within a guest
 #[repr(C)]
-#[derive(Clone, Debug)]
-pub struct Aarch64VCpu {
+#[derive(Debug)]
+pub struct Aarch64VCpu<H: AxVCpuHal> {
     // DO NOT modify `guest_regs` and `host_stack_top` and their order unless you do know what you are doing!
     // DO NOT add anything before or between them unless you do know what you are doing!
     ctx: TrapFrame,
@@ -47,6 +51,7 @@ pub struct Aarch64VCpu {
     guest_system_regs: GuestSystemRegisters,
     /// The MPIDR_EL1 value for the vCPU.
     mpidr: u64,
+    _phantom: PhantomData<H>,
 }
 
 /// Configuration for creating a new `Aarch64VCpu`
@@ -58,7 +63,7 @@ pub struct Aarch64VCpuCreateConfig {
     pub mpidr_el1: u64,
 }
 
-impl axvcpu::AxArchVCpu for Aarch64VCpu {
+impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
     type CreateConfig = Aarch64VCpuCreateConfig;
 
     type SetupConfig = ();
@@ -69,6 +74,7 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
             host_stack_top: 0,
             guest_system_regs: GuestSystemRegisters::default(),
             mpidr: config.mpidr_el1,
+            _phantom: PhantomData,
         })
     }
 
@@ -117,7 +123,7 @@ impl axvcpu::AxArchVCpu for Aarch64VCpu {
 }
 
 // Private function
-impl Aarch64VCpu {
+impl<H: AxVCpuHal> Aarch64VCpu<H> {
     #[inline(never)]
     unsafe fn run_guest(&mut self) -> usize {
         // Save function call context.
