@@ -189,7 +189,7 @@ impl Aarch64VCpu {
 
     /// Init guest context. Also set some el2 register value.
     fn init_vm_context(&mut self) {
-        CNTHCTL_EL2.modify(CNTHCTL_EL2::EL1PCEN::CLEAR + CNTHCTL_EL2::EL1PCTEN::CLEAR);
+        CNTHCTL_EL2.modify(CNTHCTL_EL2::EL1PCEN::SET + CNTHCTL_EL2::EL1PCTEN::SET);
         self.guest_system_regs.cntvoff_el2 = 0;
         self.guest_system_regs.cntkctl_el1 = 0;
 
@@ -203,7 +203,15 @@ impl Aarch64VCpu {
             + VTCR_EL2::SL0.val(0b01)
             + VTCR_EL2::T0SZ.val(64 - 39))
         .into();
-        self.guest_system_regs.hcr_el2 = (HCR_EL2::VM::Enable + HCR_EL2::RW::EL1IsAarch64).into();
+        self.guest_system_regs.hcr_el2 = (HCR_EL2::VM::Enable
+            + HCR_EL2::RW::EL1IsAarch64
+            + HCR_EL2::IMO::EnableVirtualIRQ
+            + HCR_EL2::FMO::EnableVirtualFIQ
+            + HCR_EL2::TSC::EnableTrapEl1SmcToEl2)
+            .into();
+        // self.guest_system_regs.cnthctl_el2 =
+        //     (CNTHCTL_EL2::EL1PCEN::CLEAR + CNTHCTL_EL2::EL1PCTEN::CLEAR).into();
+        // self.guest_system_regs.hcr_el2 = (HCR_EL2::VM::Enable + HCR_EL2::RW::EL1IsAarch64).into();
         // self.system_regs.hcr_el2 |= 1<<27;
         // + HCR_EL2::IMO::EnableVirtualIRQ).into();
         // trap el1 smc to el2

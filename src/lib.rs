@@ -28,7 +28,6 @@ pub fn has_hardware_support() -> bool {
     // In Cortex-A78, we can use
     // [ID_AA64MMFR1_EL1](https://developer.arm.com/documentation/101430/0102/Register-descriptions/AArch64-system-registers/ID-AA64MMFR1-EL1--AArch64-Memory-Model-Feature-Register-1--EL1)
     // to get whether Virtualization Host Extensions is supported.
-    registers::emu_register_init();
     // Current just return true by default.
     true
 }

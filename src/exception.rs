@@ -10,7 +10,7 @@ use crate::exception_utils::{
     exception_data_abort_access_width, exception_data_abort_handleable,
     exception_data_abort_is_permission_fault, exception_data_abort_is_translate_fault,
     exception_esr, exception_fault_addr, exception_next_instruction_step, exception_sysreg_addr,
-    exception_sysreg_direction_write, exception_sysreg_gpr, sysreg_enc_addr,
+    exception_sysreg_direction_write, exception_sysreg_gpr,
 };
 use crate::TrapFrame;
 
@@ -125,6 +125,7 @@ pub fn handle_exception_sync(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> 
             })
         }
         Some(ESR_EL2::EC::Value::TrappedMsrMrs) => handle_system_register(ctx),
+        // Some(ESR_EL2::EC::Value::Unknown) => Ok(AxVCpuExitReason::Nothing),
         _ => {
             panic!(
                 "handler not presents for EC_{} @ipa 0x{:x}, @pc 0x{:x}, @esr 0x{:x},
@@ -189,7 +190,7 @@ fn handle_system_register(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitR
 
 fn handle_data_abort(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
     let addr = exception_fault_addr()?;
-    debug!("data fault addr {:?}, esr: 0x{:x}", addr, exception_esr());
+    trace!("data fault addr {:?}, esr: 0x{:x}", addr, exception_esr());
 
     let access_width = exception_data_abort_access_width();
     let is_write = exception_data_abort_access_is_write();

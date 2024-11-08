@@ -15,6 +15,11 @@ numeric-enum-macro = "0.2"
 
 axerrno = "0.1.0"
 percpu = "0.1.4"
+lazy_static = { version = "1.5", features = ["spin_no_std"] }
 
 axaddrspace = { git = "https://github.com/arceos-hypervisor/axaddrspace.git" }
 axvcpu = { git = "https://github.com/arceos-hypervisor/axvcpu.git" }
+axhal = { path = "../../arceos/modules/axhal" }
+arm_gicv2 = { git = "https://github.com/arceos-hypervisor/arm_gicv2.git"}
+# aarch64_sysreg = { git = "https://github.com/arceos-hypervisor/aarch64_sysreg.git"}
+aarch64_sysreg = "0.1.1"

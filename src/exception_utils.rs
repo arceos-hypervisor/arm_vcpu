@@ -171,33 +171,6 @@ pub fn exception_iss() -> usize {
     ESR_EL2.read(ESR_EL2::ISS) as usize
 }
 
-/// Generates a system register address encoding based on the given operands and control register numbers.
-/// This function uses bitwise operations to combine the parameters into a 32-bit address value.
-///
-/// # Arguments
-/// * `op0` - The first operand, must be in the range 0 to 3.
-/// * `op1` - The second operand, must be in the range 0 to 7.
-/// * `crn` - The control register number (CRn), must be in the range 0 to 15.
-/// * `crm` - The control register number (CRm), must be in the range 0 to 15.
-/// * `op2` - The third operand, must be in the range 0 to 7.
-///
-/// # Returns
-/// * A 32-bit address value representing the system register encoding.
-///
-/// # Example
-/// ```
-/// let addr = sysreg_enc_addr(1, 2, 3, 4, 5);
-/// assert_eq!(addr, 0x10000000 | (5 << 17) | (2 << 14) | (3 << 10) | (4 << 1));
-/// ```
-#[inline(always)]
-pub const fn sysreg_enc_addr(op0: usize, op1: usize, crn: usize, crm: usize, op2: usize) -> usize {
-    (((op0) & 0x3) << 20)
-        | (((op2) & 0x7) << 17)
-        | (((op1) & 0x7) << 14)
-        | (((crn) & 0xf) << 10)
-        | (((crm) & 0xf) << 1)
-}
-
 #[inline(always)]
 pub fn exception_sysreg_direction_write(iss: u64) -> bool {
     const ESR_ISS_SYSREG_DIRECTION: u64 = 0b1;

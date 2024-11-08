@@ -185,6 +185,7 @@ impl Aarch64ContextFrame {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GuestSystemRegisters {
     // generic timer
+    pub cnthctl_el2: u64,
     pub cntvoff_el2: u64,
     cntp_cval_el0: u64,
     cntv_cval_el0: u64,
@@ -249,6 +250,7 @@ impl GuestSystemRegisters {
     /// This method uses inline assembly to read the values of various system registers
     /// and stores them in the corresponding fields of the `GuestSystemRegisters` structure.
     pub unsafe fn store(&mut self) {
+        asm!("mrs {0}, CNTHCTL_EL2", out(reg) self.cnthctl_el2);
         asm!("mrs {0}, CNTVOFF_EL2", out(reg) self.cntvoff_el2);
         asm!("mrs {0}, CNTV_CVAL_EL0", out(reg) self.cntv_cval_el0);
         asm!("mrs {0:x}, CNTKCTL_EL1", out(reg) self.cntkctl_el1);
@@ -297,6 +299,7 @@ impl GuestSystemRegisters {
     /// Each system register is restored with its corresponding value from the `GuestSystemRegisters`, ensuring
     /// that the virtual machine or thread resumes execution with the correct context.
     pub unsafe fn restore(&self) {
+        asm!("msr CNTHCTL_EL2, {0}", in(reg) self.cnthctl_el2);
         asm!("msr CNTV_CVAL_EL0, {0}", in(reg) self.cntv_cval_el0);
         asm!("msr CNTKCTL_EL1, {0:x}", in (reg) self.cntkctl_el1);
         asm!("msr CNTV_CTL_EL0, {0:x}", in (reg) self.cntv_ctl_el0);

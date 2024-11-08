@@ -84,6 +84,14 @@
     bl     vmexit_trampoline
 .endm
 
+.macro HANDLE_IRQ_VCPU2
+.p2align 7
+    SAVE_REGS_FROM_EL1
+    mov x8, #122
+    mov x9, #0x9000000
+    str x8, [x9]
+    b       .Lexception_return_el2
+.endm
 
 .section .text
 .p2align 11
@@ -103,7 +111,7 @@ exception_vector_base_vcpu:
 
     // lower EL, aarch64
     HANDLE_LOWER_SYNC_VCPU
-    HANDLE_IRQ_VCPU
+    HANDLE_IRQ_VCPU2
     INVALID_EXCP_EL2 2 2
     INVALID_EXCP_EL2 3 2
 
