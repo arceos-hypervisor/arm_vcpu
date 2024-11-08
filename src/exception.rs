@@ -235,7 +235,42 @@ fn handle_psci_call(ctx: &mut TrapFrame) -> Option<AxResult<AxVCpuExitReason>> {
     })
 }
 
-/// A trampoline function for sp switching during handling VM exits.
+/// Dispatches IRQs to the appropriate handler provided by the underlying host OS.
+fn dispatch_irq() {
+    crate_interface::call_interface!(crate::HalIf::irq_hanlder())
+}
+
+/// A trampoline function for handling exceptions (VM exits) in EL2.
+///
+/// Functionality:
+///
+/// 1. **Check if VCPU is running:**
+///    - The `vcpu_running` function is called to check if the VCPU is currently running.
+///     If the VCPU is running, the control flow is transferred to the `return_run_guest` function.
+///
+/// 2. **Dispatch IRQ:**
+///   - If there is no active vcpu running, the `dispatch_irq` function is called to handle the IRQ,
+///     which will dispatch this irq routine to the underlining host OS.
+///
+#[naked]
+#[no_mangle]
+unsafe extern "C" fn vmexit_trampoline() {
+    core::arch::asm!(
+        "bl {vcpu_running}", // Check if vcpu is running.
+        "cbnz x0, {return_run_guest}", // If vcpu_running returns true, jump to `return_run_guest`.
+        "bl {dispatch_irq}",
+        "ret", // Control flow is handed back to Aarch64VCpu.run(), simulating the normal return of the `run_guest` function.
+        vcpu_running = sym crate::vcpu::vcpu_running,
+        return_run_guest = sym return_run_guest,
+        dispatch_irq = sym dispatch_irq,
+        options(noreturn),
+    )
+}
+
+/// A trampoline function for sp switching during handling VM exits,
+/// when **there is a active VCPU running**, which means that the host context is stored
+/// into host stack in `run_guest` function.
+///
 /// # Functionality
 ///
 /// 1. **Restore Previous Host Stack pointor:**
@@ -269,8 +304,7 @@ fn handle_psci_call(ctx: &mut TrapFrame) -> Option<AxResult<AxVCpuExitReason>> {
 ///   invoked as part of the low-level hypervisor or VM exit handling routines.
 #[naked]
 #[no_mangle]
-unsafe extern "C" fn vmexit_trampoline() {
-    // Note: Currently `sp` points to `&Aarch64VCpu.ctx`, which is just the base address of Aarch64VCpu struct.
+unsafe extern "C" fn return_run_guest() {
     core::arch::asm!(
         "add sp, sp, 34 * 8",       // Skip the exception frame.
         "mov x9, sp", // Currently `sp` points to `&Aarch64VCpu.host_stack_top`, see `run_guest()` in vcpu.rs.

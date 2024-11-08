@@ -19,6 +19,9 @@ core::arch::global_asm!(include_str!("entry.S"));
 #[percpu::def_percpu]
 static HOST_SP_EL0: u64 = 0;
 
+#[percpu::def_percpu]
+static VCPU_RUNNING: bool = false;
+
 /// Save host's `SP_EL0` to the current percpu region.
 unsafe fn save_host_sp_el0() {
     HOST_SP_EL0.write_current_raw(SP_EL0.get())
@@ -27,6 +30,21 @@ unsafe fn save_host_sp_el0() {
 /// Restore host's `SP_EL0` from the current percpu region.
 unsafe fn restore_host_sp_el0() {
     SP_EL0.set(HOST_SP_EL0.read_current_raw());
+}
+
+#[no_mangle]
+unsafe fn set_vcpu_running() {
+    VCPU_RUNNING.write_current_raw(true);
+}
+
+#[no_mangle]
+pub(crate) unsafe fn clear_vcpu_running() {
+    VCPU_RUNNING.write_current_raw(false);
+}
+
+#[no_mangle]
+pub(crate) unsafe fn vcpu_running() -> bool {
+    VCPU_RUNNING.read_current_raw()
 }
 
 /// (v)CPU register state that must be saved or restored when entering/exiting a VM or switching
@@ -104,6 +122,9 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
             self.restore_vm_system_regs();
             self.run_guest()
         };
+        unsafe {
+            clear_vcpu_running();
+        }
 
         let trap_kind = TrapKind::try_from(exit_reson as u8).expect("Invalid TrapKind");
         self.vmexit_handler(trap_kind)
@@ -128,18 +149,25 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
     unsafe fn run_guest(&mut self) -> usize {
         // Save function call context.
         core::arch::asm!(
-            save_regs_to_stack!(),  // Save host context.
+            // Save host context.
+            save_regs_to_stack!(),
             "mov x9, sp",
             "mov x10, x11",
-            "str x9, [x10]",    // Save current host stack top in the `Aarch64VCpu` struct.
+            // Save current host stack top in the `Aarch64VCpu` struct.
+            "str x9, [x10]",
             "mov x0, x11",
+            // Since now the host context is saved into host stack,
+            // mark `VCPU_RUNNING` as true,
+            // so that a exception's control flow can be redirected to the `return_run_guest`.
+            "bl {set_vcpu_running}",
             "b context_vm_entry",
+            set_vcpu_running = sym set_vcpu_running,
             // in(reg) here is dangerous, because the compiler may use the register we want to use, creating a conflict.
             in("x11") &self.host_stack_top as *const _ as usize,
             options(nostack)
         );
 
-        // the dummy return value, the real return value is in x0 when `vmexit_trampoline` returns
+        // the dummy return value, the real return value is in x0 when `return_run_guest` returns
         0
     }
 

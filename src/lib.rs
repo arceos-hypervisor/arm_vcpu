@@ -30,3 +30,9 @@ pub fn has_hardware_support() -> bool {
     // Current just return true by default.
     true
 }
+
+/// Low-level resource interfaces that must be implemented by the crate user.
+#[crate_interface::def_interface]
+pub trait HalIf {
+    fn irq_hanlder();
+}
