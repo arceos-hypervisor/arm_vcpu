@@ -1,17 +1,21 @@
+use core::marker::PhantomData;
+
 use aarch64_cpu::registers::*;
+use tock_registers::interfaces::ReadWriteable;
 
 use axerrno::AxResult;
-use axvcpu::AxArchPerCpu;
+use axvcpu::{AxArchPerCpu, AxVCpuHal};
 
 /// Per-CPU data. A pointer to this struct is loaded into TP when a CPU starts. This structure
 #[repr(C)]
 #[repr(align(4096))]
-pub struct Aarch64PerCpu {
+pub struct Aarch64PerCpu<H: AxVCpuHal> {
     //stack_top_addr has no use yet?
     /// per cpu id
     pub cpu_id: usize,
     /// context address of this cpu
     pub ctx: Option<usize>,
+    _phantom: PhantomData<H>,
 }
 
 #[percpu::def_percpu]
@@ -21,14 +25,17 @@ extern "C" {
     fn exception_vector_base_vcpu();
 }
 
-impl AxArchPerCpu for Aarch64PerCpu {
+impl<H: AxVCpuHal> AxArchPerCpu for Aarch64PerCpu<H> {
     fn new(cpu_id: usize) -> AxResult<Self> {
-        Ok(Self { cpu_id, ctx: None })
+        Ok(Self {
+            cpu_id,
+            ctx: None,
+            _phantom: PhantomData,
+        })
     }
 
     fn is_enabled(&self) -> bool {
-        let hcr_el2 = HCR_EL2.get();
-        hcr_el2 & 1 != 0
+        HCR_EL2.is_set(HCR_EL2::VM)
     }
 
     fn hardware_enable(&mut self) -> AxResult {
@@ -41,7 +48,14 @@ impl AxArchPerCpu for Aarch64PerCpu {
         // defined in this crate.
         VBAR_EL2.set(exception_vector_base_vcpu as usize as _);
 
-        HCR_EL2.set(HCR_EL2::VM::Enable.into());
+        HCR_EL2.modify(
+            HCR_EL2::VM::Enable
+                + HCR_EL2::RW::EL1IsAarch64
+                + HCR_EL2::IMO::EnableVirtualIRQ
+                + HCR_EL2::FMO::EnableVirtualFIQ
+                + HCR_EL2::TSC::EnableTrapEl1SmcToEl2,
+        );
+
         Ok(())
     }
 

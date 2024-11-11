@@ -45,35 +45,6 @@ core::arch::global_asm!(
     exception_irq = const EXCEPTION_IRQ,
 );
 
-/// Handles IRQ (Interrupt Request) exceptions that occur during the execution of a guest VM.
-///
-/// This function is responsible for processing external interrupts.
-///
-/// # Arguments
-///
-/// * `_ctx` - A mutable reference to the `TrapFrame`, which contains the saved state of the
-///            guest VM's CPU registers at the time of the exception. This is currently unused
-///            but included for future expansion.
-///
-/// # Returns
-///
-/// An `AxResult` containing an `AxVCpuExitReason` with the reason for the VM exit.
-///
-/// # TODO
-///
-/// - Implement proper handling of both current and lower EL IRQs.
-/// - Replace the temporary vector `33` with the actual interrupt vector once the
-///   full implementation is complete.
-///
-/// # Notes
-///
-/// This function is a placeholder and should be expanded to fully support IRQ handling
-/// in future iterations.
-///
-pub fn handle_exception_irq(_ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
-    Ok(AxVCpuExitReason::ExternalInterrupt { vector: 33 })
-}
-
 /// Handles synchronous exceptions that occur during the execution of a guest VM.
 ///
 /// This function examines the exception class (EC) to determine the cause of the exception
@@ -251,15 +222,23 @@ fn dispatch_irq() {
 /// 2. **Dispatch IRQ:**
 ///   - If there is no active vcpu running, the `dispatch_irq` function is called to handle the IRQ,
 ///     which will dispatch this irq routine to the underlining host OS.
+///   - The IRQ handling routine will end up calling `exception_return_el2` here.
 ///
+/// Note that the `return_run_guest` will never return.
 #[naked]
 #[no_mangle]
 unsafe extern "C" fn vmexit_trampoline() {
     core::arch::asm!(
         "bl {vcpu_running}", // Check if vcpu is running.
-        "cbnz x0, {return_run_guest}", // If vcpu_running returns true, jump to `return_run_guest`.
+        // If vcpu_running returns true, jump to `return_run_guest`,
+        // after that the control flow is handed back to Aarch64VCpu.run(),
+        // simulating the normal return of the `run_guest` function.
+        "cbnz x0, {return_run_guest}",
+        // If vcpu_running returns false, there is no active vcpu running,
+        // jump to `dispatch_irq`.
         "bl {dispatch_irq}",
-        "ret", // Control flow is handed back to Aarch64VCpu.run(), simulating the normal return of the `run_guest` function.
+        // Return from exception.
+        "b  .Lexception_return_el2",
         vcpu_running = sym crate::vcpu::vcpu_running,
         return_run_guest = sym return_run_guest,
         dispatch_irq = sym dispatch_irq,
@@ -304,12 +283,13 @@ unsafe extern "C" fn vmexit_trampoline() {
 ///   invoked as part of the low-level hypervisor or VM exit handling routines.
 #[naked]
 #[no_mangle]
-unsafe extern "C" fn return_run_guest() {
+unsafe extern "C" fn return_run_guest() -> ! {
     core::arch::asm!(
-        "add sp, sp, 34 * 8",       // Skip the exception frame.
-        "mov x9, sp", // Currently `sp` points to `&Aarch64VCpu.host_stack_top`, see `run_guest()` in vcpu.rs.
+        // Curretly `sp` points to the base address of `Aarch64VCpu.ctx`, which stores guest's `TrapFrame`.
+        "add x9, sp, 34 * 8", // Skip the exception frame.
+        // Currently `x9` points to `&Aarch64VCpu.host_stack_top`, see `run_guest()` in vcpu.rs.
         "ldr x10, [x9]", // Get `host_stack_top` value from `&Aarch64VCpu.host_stack_top`.
-        "mov sp, x10", // Set `sp` as the host stack top.
+        "mov sp, x10",   // Set `sp` as the host stack top.
         restore_regs_from_stack!(), // Restore host function context frame.
         "ret", // Control flow is handed back to Aarch64VCpu.run(), simulating the normal return of the `run_guest` function.
         options(noreturn),

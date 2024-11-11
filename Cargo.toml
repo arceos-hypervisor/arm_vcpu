@@ -16,7 +16,4 @@ percpu = "0.1.4"
 crate_interface = "0.1"
 
 axaddrspace = { git = "https://github.com/arceos-hypervisor/axaddrspace.git" }
-axvcpu = { git = "https://github.com/arceos-hypervisor/axvcpu.git" }
-
-[patch."https://github.com/arceos-hypervisor/axvcpu.git"]
-axvcpu = { path = "../axvcpu" }
+axvcpu = { git = "https://github.com/arceos-hypervisor/axvcpu.git", branch = "axvcpuhal" }

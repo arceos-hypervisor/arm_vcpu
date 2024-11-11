@@ -5,16 +5,12 @@ use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 
 use axaddrspace::{GuestPhysAddr, HostPhysAddr};
 use axerrno::AxResult;
-use axvcpu::AxVCpuExitReason;
-
-use axvcpu::AxVCpuHal;
+use axvcpu::{AxVCpuExitReason, AxVCpuHal};
 
 use crate::context_frame::GuestSystemRegisters;
-use crate::exception::{handle_exception_irq, handle_exception_sync, TrapKind};
+use crate::exception::{handle_exception_sync, TrapKind};
 use crate::exception_utils::exception_class_value;
 use crate::TrapFrame;
-
-core::arch::global_asm!(include_str!("entry.S"));
 
 #[percpu::def_percpu]
 static HOST_SP_EL0: u64 = 0;
@@ -122,6 +118,7 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
             self.restore_vm_system_regs();
             self.run_guest()
         };
+
         unsafe {
             clear_vcpu_running();
         }
@@ -145,72 +142,6 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
 
 // Private function
 impl<H: AxVCpuHal> Aarch64VCpu<H> {
-    #[inline(never)]
-    unsafe fn run_guest(&mut self) -> usize {
-        // Save function call context.
-        core::arch::asm!(
-            // Save host context.
-            save_regs_to_stack!(),
-            "mov x9, sp",
-            "mov x10, x11",
-            // Save current host stack top in the `Aarch64VCpu` struct.
-            "str x9, [x10]",
-            "mov x0, x11",
-            // Since now the host context is saved into host stack,
-            // mark `VCPU_RUNNING` as true,
-            // so that a exception's control flow can be redirected to the `return_run_guest`.
-            "bl {set_vcpu_running}",
-            "b context_vm_entry",
-            set_vcpu_running = sym set_vcpu_running,
-            // in(reg) here is dangerous, because the compiler may use the register we want to use, creating a conflict.
-            in("x11") &self.host_stack_top as *const _ as usize,
-            options(nostack)
-        );
-
-        // the dummy return value, the real return value is in x0 when `return_run_guest` returns
-        0
-    }
-
-    unsafe fn restore_vm_system_regs(&mut self) {
-        // load system regs
-        core::arch::asm!(
-            "
-            mov x3, xzr           // Trap nothing from EL1 to El2.
-            msr cptr_el2, x3"
-        );
-        self.guest_system_regs.restore();
-        core::arch::asm!(
-            "
-            ic  iallu
-            tlbi	alle2
-            tlbi	alle1         // Flush tlb
-            dsb	nsh
-            isb"
-        );
-    }
-
-    fn vmexit_handler(&mut self, exit_reason: TrapKind) -> AxResult<AxVCpuExitReason> {
-        trace!(
-            "Aarch64VCpu vmexit_handler() esr:{:#x} ctx:{:#x?}",
-            exception_class_value(),
-            self.ctx
-        );
-
-        unsafe {
-            // Store guest system regs
-            self.guest_system_regs.store();
-            // Restore host SP_EL0.
-            // This has to be done after guest's SP_EL0 is stored by `ext_regs_store`.
-            restore_host_sp_el0();
-        }
-
-        match exit_reason {
-            TrapKind::Synchronous => handle_exception_sync(&mut self.ctx),
-            TrapKind::Irq => handle_exception_irq(&mut self.ctx),
-            _ => panic!("Unhandled exception {:?}", exit_reason),
-        }
-    }
-
     fn init_hv(&mut self) {
         self.ctx.spsr = (SPSR_EL1::M::EL1h
             + SPSR_EL1::I::Masked
@@ -260,5 +191,95 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
     #[allow(unused)]
     fn get_gpr(&self, idx: usize) {
         self.ctx.gpr(idx);
+    }
+}
+
+/// Private functions related to vcpu runtime control flow.
+impl<H: AxVCpuHal> Aarch64VCpu<H> {
+    /// Save host context and run guest.
+    ///
+    /// When a VM-Exit happens when guest's vCpu is running,
+    /// the control flow will be redirected to this function through `return_run_guest`.
+    #[inline(never)]
+    unsafe fn run_guest(&mut self) -> usize {
+        // Save function call context.
+        core::arch::asm!(
+            // Save host context.
+            save_regs_to_stack!(),
+            "mov x9, sp",
+            "mov x10, x11",
+            // Save current host stack top in the `Aarch64VCpu` struct.
+            "str x9, [x10]",
+            "mov x0, x11",
+            // Since now the host context is saved into host stack,
+            // mark `VCPU_RUNNING` as true,
+            // so that a exception's control flow can be redirected to the `return_run_guest`.
+            "bl {set_vcpu_running}",
+            "b context_vm_entry",
+            set_vcpu_running = sym set_vcpu_running,
+            // in(reg) here is dangerous, because the compiler may use the register we want to use, creating a conflict.
+            in("x11") &self.host_stack_top as *const _ as usize,
+            options(nostack)
+        );
+
+        // the dummy return value, the real return value is in x0 when `return_run_guest` returns
+        0
+    }
+
+    /// Restores guest system control registers.
+    unsafe fn restore_vm_system_regs(&mut self) {
+        // load system regs
+        core::arch::asm!(
+            "
+            mov x3, xzr           // Trap nothing from EL1 to El2.
+            msr cptr_el2, x3"
+        );
+        self.guest_system_regs.restore();
+        core::arch::asm!(
+            "
+            ic  iallu
+            tlbi	alle2
+            tlbi	alle1         // Flush tlb
+            dsb	nsh
+            isb"
+        );
+    }
+
+    /// Handle VM-Exits.
+    ///
+    /// Parameters:
+    /// - `exit_reason`: The reason why the VM-Exit happened in [`TrapKind`].
+    ///
+    /// Returns:
+    /// - [`AxVCpuExitReason`]: a wrappered VM-Exit reason needed to be handled by the hypervisor.
+    ///
+    /// This function may panic for unhandled exceptions.
+    fn vmexit_handler(&mut self, exit_reason: TrapKind) -> AxResult<AxVCpuExitReason> {
+        trace!(
+            "Aarch64VCpu vmexit_handler() esr:{:#x} ctx:{:#x?}",
+            exception_class_value(),
+            self.ctx
+        );
+
+        unsafe {
+            // Store guest system regs
+            self.guest_system_regs.store();
+
+            // Store guest `SP_EL0` into the `Aarch64VCpu` struct,
+            // which will be restored when the guest is resumed in `exception_return_el2`.
+            self.ctx.sp_el0 = self.guest_system_regs.sp_el0;
+
+            // Restore host `SP_EL0`.
+            // This has to be done after guest's SP_EL0 is stored by `ext_regs_store`.
+            restore_host_sp_el0();
+        }
+
+        match exit_reason {
+            TrapKind::Synchronous => handle_exception_sync(&mut self.ctx),
+            TrapKind::Irq => Ok(AxVCpuExitReason::ExternalInterrupt {
+                vector: H::irq_fecth() as _,
+            }),
+            _ => panic!("Unhandled exception {:?}", exit_reason),
+        }
     }
 }
