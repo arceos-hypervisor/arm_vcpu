@@ -34,5 +34,8 @@ pub fn has_hardware_support() -> bool {
 /// Low-level resource interfaces that must be implemented by the crate user.
 #[crate_interface::def_interface]
 pub trait HalIf {
+    /// Irq handler that has to be implemented by the user,
+    /// this handler is called when an interrupt is triggered with no active vcpu running.
+    /// TODO: find a way to convergence it inside [`axvcpu::AxVCpuHal`].
     fn irq_hanlder();
 }
