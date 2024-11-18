@@ -10,11 +10,8 @@ use axvcpu::{AxArchPerCpu, AxVCpuHal};
 #[repr(C)]
 #[repr(align(4096))]
 pub struct Aarch64PerCpu<H: AxVCpuHal> {
-    //stack_top_addr has no use yet?
     /// per cpu id
     pub cpu_id: usize,
-    /// context address of this cpu
-    pub ctx: Option<usize>,
     _phantom: PhantomData<H>,
 }
 
@@ -29,7 +26,6 @@ impl<H: AxVCpuHal> AxArchPerCpu for Aarch64PerCpu<H> {
     fn new(cpu_id: usize) -> AxResult<Self> {
         Ok(Self {
             cpu_id,
-            ctx: None,
             _phantom: PhantomData,
         })
     }
