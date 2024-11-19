@@ -206,9 +206,12 @@ fn handle_psci_call(ctx: &mut TrapFrame) -> Option<AxResult<AxVCpuExitReason>> {
     })
 }
 
-/// Dispatches IRQs to the appropriate handler provided by the underlying host OS.
+/// Dispatches IRQs to the appropriate handler provided by the underlying host OS,
+/// which is registered at [`crate::pcpu::IRQ_HANDLER`] during `Aarch64PerCpu::new()`.
 fn dispatch_irq() {
-    crate_interface::call_interface!(crate::HalIf::irq_hanlder())
+    unsafe { crate::pcpu::IRQ_HANDLER.current_ref_raw() }
+        .get()
+        .unwrap()()
 }
 
 /// A trampoline function for handling exceptions (VM exits) in EL2.
