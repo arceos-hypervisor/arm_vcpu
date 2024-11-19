@@ -277,7 +277,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
         match exit_reason {
             TrapKind::Synchronous => handle_exception_sync(&mut self.ctx),
             TrapKind::Irq => Ok(AxVCpuExitReason::ExternalInterrupt {
-                vector: H::irq_fecth() as _,
+                vector: H::irq_fetch() as _,
             }),
             _ => panic!("Unhandled exception {:?}", exit_reason),
         }
