@@ -192,7 +192,6 @@ fn handle_system_register(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitR
     if write {
         return Ok(AxVCpuExitReason::SysRegWrite {
             addr,
-            reg,
             value: context_frame.gpr(reg as usize) as u64,
         });
     }
