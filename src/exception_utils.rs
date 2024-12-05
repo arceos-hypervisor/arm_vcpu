@@ -185,9 +185,11 @@ pub fn exception_sysreg_gpr(iss: u64) -> u64 {
     (iss >> ESR_ISS_SYSREG_REG_OFF) & ESR_ISS_SYSREG_REG_MASK
 }
 
+/// The numbering of `SystemReg` follows the order specified in the Instruction Set Specification (ISS),
+/// formatted as `<op0><op2><op1><CRn>00000<CRm>0`.
+/// (Op0[21..20] + Op2[19..17] + Op1[16..14] + CRn[13..10]) + CRm[4..1]
 #[inline(always)]
 pub const fn exception_sysreg_addr(iss: usize) -> usize {
-    // (Op0[21..20] + Op2[19..17] + Op1[16..14] + CRn[13..10]) + CRm[4..1]
     const ESR_ISS_SYSREG_ADDR: usize = (0xfff << 10) | (0xf << 1);
     iss & ESR_ISS_SYSREG_ADDR
 }

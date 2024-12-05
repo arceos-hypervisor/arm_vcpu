@@ -251,7 +251,7 @@ fn dispatch_irq() {
 ///
 /// 1. **Check if VCPU is running:**
 ///    - The `vcpu_running` function is called to check if the VCPU is currently running.
-///     If the VCPU is running, the control flow is transferred to the `return_run_guest` function.
+///      If the VCPU is running, the control flow is transferred to the `return_run_guest` function.
 ///
 /// 2. **Dispatch IRQ:**
 ///   - If there is no active vcpu running, the `dispatch_irq` function is called to handle the IRQ,
