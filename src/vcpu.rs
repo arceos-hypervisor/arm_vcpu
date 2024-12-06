@@ -222,8 +222,14 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             options(nostack)
         );
 
-        // the dummy return value, the real return value is in x0 when `return_run_guest` returns
-        0
+        // Return value is the exit reason, the real return value is in x0 when `return_run_guest` returns
+        let exit_reason: usize;
+        core::arch::asm!(
+            "mov {}, x0",
+            out(reg) exit_reason,
+            options(nostack)
+        );
+        exit_reason
     }
 
     /// Restores guest system control registers.
