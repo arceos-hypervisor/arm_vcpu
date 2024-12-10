@@ -263,14 +263,14 @@ fn dispatch_irq() {
 #[no_mangle]
 unsafe extern "C" fn vmexit_trampoline() {
     core::arch::asm!(
-        "mov x6, x0", // Save the exit reason.
+        "mov x9, x0", // Save the exit reason.
         "bl {vcpu_running}", // Check if vcpu is running.
-        "mov x7, x0", // Save the return value of vcpu_running.
-        "mov x0, x6", // Restore the exit reason.
+        "mov x10, x0", // Save the return value of vcpu_running.
+        "mov x0, x9", // Restore the exit reason.
         // If vcpu_running returns true, jump to `return_run_guest`,
         // after that the control flow is handed back to Aarch64VCpu.run(),
         // simulating the normal return of the `run_guest` function.
-        "cbnz x7, {return_run_guest}",
+        "cbnz x10, {return_run_guest}",
         // If vcpu_running returns false, there is no active vcpu running,
         // jump to `dispatch_irq`.
         "bl {dispatch_irq}",
