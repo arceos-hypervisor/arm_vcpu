@@ -2,6 +2,7 @@
 #![feature(naked_functions)]
 #![feature(doc_cfg)]
 #![feature(asm_const)]
+#![feature(exclusive_range_pattern)]
 #![doc = include_str!("../README.md")]
 
 #[macro_use]
@@ -13,6 +14,7 @@ mod exception_utils;
 mod exception;
 mod pcpu;
 mod vcpu;
+mod smc;
 
 pub use self::pcpu::Aarch64PerCpu;
 pub use self::vcpu::{Aarch64VCpu, Aarch64VCpuCreateConfig};
