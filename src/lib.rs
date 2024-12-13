@@ -13,8 +13,8 @@ mod context_frame;
 mod exception_utils;
 mod exception;
 mod pcpu;
-mod vcpu;
 mod smc;
+mod vcpu;
 
 pub use self::pcpu::Aarch64PerCpu;
 pub use self::vcpu::{Aarch64VCpu, Aarch64VCpuCreateConfig};
