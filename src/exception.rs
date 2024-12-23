@@ -105,17 +105,7 @@ pub fn handle_exception_sync(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> 
             let elr = ctx.exception_pc();
             let val = elr + exception_next_instruction_step();
             ctx.set_exception_pc(val);
-
-            // Is this a psci call?
-            if let Some(result) = handle_psci_call(ctx) {
-                return result;
-            } else {
-                // We just forward the SMC call to the ATF directly.
-                // The args are from lower EL, so it is safe to call the ATF.
-                (ctx.gpr[0], ctx.gpr[1], ctx.gpr[2], ctx.gpr[3]) =
-                    unsafe { crate::smc::smc_call(ctx.gpr[0], ctx.gpr[1], ctx.gpr[2], ctx.gpr[3]) };
-                Ok(AxVCpuExitReason::Nothing)
-            }
+            handle_smc64_exception(ctx)
         }
         _ => {
             panic!(
@@ -260,6 +250,23 @@ fn handle_psci_call(ctx: &mut TrapFrame) -> Option<AxResult<AxVCpuExitReason>> {
         // We just forward these request to the ATF directly.
         Some(PSCI_FN_VERSION..PSCI_FN_END) => None,
         _ => None,
+    }
+}
+
+/// Handles SMC (Secure Monitor Call) exceptions.
+///
+/// This function will judge if the SMC call is a PSCI call, if so, it will handle it as a PSCI call.
+/// Otherwise, it will forward the SMC call to the ATF directly.
+fn handle_smc64_exception(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
+    // Is this a psci call?
+    if let Some(result) = handle_psci_call(ctx) {
+        return result;
+    } else {
+        // We just forward the SMC call to the ATF directly.
+        // The args are from lower EL, so it is safe to call the ATF.
+        (ctx.gpr[0], ctx.gpr[1], ctx.gpr[2], ctx.gpr[3]) =
+            unsafe { crate::smc::smc_call(ctx.gpr[0], ctx.gpr[1], ctx.gpr[2], ctx.gpr[3]) };
+        Ok(AxVCpuExitReason::Nothing)
     }
 }
 
