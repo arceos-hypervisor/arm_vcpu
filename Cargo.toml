@@ -15,5 +15,5 @@ axerrno = "0.1.0"
 percpu = "0.1.4"
 aarch64_sysreg = "0.1.1"
 
-axaddrspace = { git = "https://github.com/arceos-hypervisor/axaddrspace.git", branch = "update_toolchain" }
-axvcpu = { git = "https://github.com/arceos-hypervisor/axvcpu.git", branch = "update_toolchain" }
+axaddrspace = { git = "https://github.com/arceos-hypervisor/axaddrspace.git" }
+axvcpu = { git = "https://github.com/arceos-hypervisor/axvcpu.git" }
