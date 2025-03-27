@@ -1,9 +1,5 @@
 use aarch64_cpu::registers::{ESR_EL2, HCR_EL2, Readable, SCTLR_EL1, VTCR_EL2, VTTBR_EL2};
 
-use axaddrspace::GuestPhysAddr;
-use axerrno::{AxError, AxResult};
-use axvcpu::{AccessWidth, AxVCpuExitReason};
-
 use crate::TrapFrame;
 use crate::exception_utils::{
     exception_class, exception_class_value, exception_data_abort_access_is_write,
@@ -13,6 +9,10 @@ use crate::exception_utils::{
     exception_esr, exception_fault_addr, exception_next_instruction_step, exception_sysreg_addr,
     exception_sysreg_direction_write, exception_sysreg_gpr,
 };
+use axaddrspace::GuestPhysAddr;
+use axaddrspace::device::{AccessWidth, SysRegAddr};
+use axerrno::{AxError, AxResult};
+use axvcpu::AxVCpuExitReason;
 
 numeric_enum_macro::numeric_enum! {
 #[repr(u8)]
@@ -203,11 +203,14 @@ fn handle_system_register(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitR
     context_frame.set_exception_pc(val);
     if write {
         return Ok(AxVCpuExitReason::SysRegWrite {
-            addr,
+            addr: SysRegAddr::new(addr),
             value: context_frame.gpr(reg as usize) as u64,
         });
     }
-    Ok(AxVCpuExitReason::SysRegRead { addr, reg })
+    Ok(AxVCpuExitReason::SysRegRead {
+        addr: SysRegAddr::new(addr),
+        reg,
+    })
 }
 
 /// Handles HVC or SMC exceptions that serve as psci (Power State Coordination Interface) calls.

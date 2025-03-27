@@ -13,7 +13,9 @@ mod exception;
 mod pcpu;
 mod smc;
 mod vcpu;
+mod sysreg;
 
+pub use self::sysreg::get_sysreg_device;
 pub use self::pcpu::Aarch64PerCpu;
 pub use self::vcpu::{Aarch64VCpu, Aarch64VCpuCreateConfig};
 

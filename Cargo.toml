@@ -17,3 +17,6 @@ aarch64_sysreg = "0.1.1"
 
 axaddrspace = { git = "https://github.com/arceos-hypervisor/axaddrspace.git" }
 axvcpu = { git = "https://github.com/arceos-hypervisor/axvcpu.git" }
+axhal = { git = "https://github.com/arceos-hypervisor/arceos.git", branch = "vmm_inject_interrupt" }
+axdevice_base = { git = "https://github.com/arceos-hypervisor/axdevice_crates.git"}
+axvisor_api = { git = "https://github.com/arceos-hypervisor/axvisor_api.git", branch = "inject_interrupt" }
