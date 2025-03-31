@@ -34,8 +34,8 @@ impl BaseDeviceOps<SysRegAddrRange> for SysCntpTvalEl0 {
 
     fn handle_read(
         &self,
-        addr: <SysRegAddrRange as DeviceAddrRange>::Addr,
-        width: AccessWidth,
+        _addr: <SysRegAddrRange as DeviceAddrRange>::Addr,
+        _width: AccessWidth,
     ) -> AxResult<usize> {
         todo!()
     }
@@ -43,7 +43,7 @@ impl BaseDeviceOps<SysRegAddrRange> for SysCntpTvalEl0 {
     fn handle_write(
         &self,
         addr: <SysRegAddrRange as DeviceAddrRange>::Addr,
-        width: AccessWidth,
+        _width: AccessWidth,
         val: usize,
     ) -> AxResult {
         info!("Write to emulator register: {:?}, value: {}", addr, val);
