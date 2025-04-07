@@ -8,17 +8,12 @@ use axaddrspace::{
     GuestPhysAddrRange,
     device::{AccessWidth, DeviceAddrRange, SysRegAddr, SysRegAddrRange},
 };
-
 use axdevice_base::{BaseDeviceOps, EmuDeviceType};
-
-use axhal::irq::inject_interrupt;
+use axerrno::AxResult;
 use axvisor_api::time::{current_time_nanos, register_timer};
 
-use core::time::Duration;
-
 use alloc::boxed::Box;
-
-use axerrno::AxResult;
+use core::time::Duration;
 
 impl BaseDeviceOps<SysRegAddrRange> for SysCntpTvalEl0 {
     fn emu_type(&self) -> EmuDeviceType {
@@ -52,7 +47,7 @@ impl BaseDeviceOps<SysRegAddrRange> for SysCntpTvalEl0 {
         register_timer(
             Duration::from_nanos(now + val as u64),
             Box::new(|_| {
-                inject_interrupt(30);
+                axvisor_api::arch::hardware_inject_virtual_interrupt(30);
             }),
         );
         Ok(())

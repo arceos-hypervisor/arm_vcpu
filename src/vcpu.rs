@@ -9,7 +9,6 @@ use crate::exception::{TrapKind, handle_exception_sync};
 use crate::exception_utils::exception_class_value;
 use axaddrspace::{GuestPhysAddr, HostPhysAddr};
 use axerrno::AxResult;
-use axhal::irq::inject_interrupt;
 use axvcpu::{AxVCpuExitReason, AxVCpuHal};
 
 #[percpu::def_percpu]
@@ -123,7 +122,7 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
     }
 
     fn inject_interrupt(&mut self, vector: usize) -> AxResult {
-        inject_interrupt(vector);
+        axvisor_api::arch::hardware_inject_virtual_interrupt(vector as u8);
         Ok(())
     }
 }
@@ -219,7 +218,6 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             options(nostack)
         );
         exit_reason
-        
     }
 
     /// Restores guest system control registers.
