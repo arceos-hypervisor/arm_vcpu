@@ -208,7 +208,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             core::arch::asm!(
                 "mov {}, x0",
                 out(reg) exit_reason
-            );            
+            );
         }
         exit_reason
     }
