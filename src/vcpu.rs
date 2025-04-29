@@ -202,8 +202,15 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             );
         }
 
-        // the dummy return value, the real return value is in x0 when `return_run_guest` returns
-        0
+        // When `vmexit_trampoline` returns, it will come back here, with its return value stored in x0. Extract it and return `run_guest`.
+        let exit_reason: usize;
+        unsafe {
+            core::arch::asm!(
+                "mov {}, x0",
+                out(reg) exit_reason
+            );            
+        }
+        exit_reason
     }
 
     /// Restores guest system control registers.
