@@ -324,7 +324,7 @@ fn current_el_sync_handler(tf: &mut TrapFrame) {
 ///
 /// - This function is not typically called directly from Rust code. Instead, it is
 ///   invoked as part of the low-level hypervisor or VM exit handling routines.
-#[naked]
+#[unsafe(naked)]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn vmexit_trampoline() -> ! {
     unsafe {
