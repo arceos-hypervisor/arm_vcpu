@@ -205,7 +205,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
         // When `vmexit_trampoline` returns, it will come back here, with its return value stored in x0. Extract it and return `run_guest`.
         // Related PR: https://github.com/arceos-hypervisor/arm_vcpu/pull/26
         // Related issue: https://github.com/arceos-hypervisor/arm_vcpu/issues/22
-        // This is a temporary workaround for the issue. 
+        // This is a temporary workaround for the issue.
         let exit_reason: usize;
         unsafe {
             core::arch::asm!(
