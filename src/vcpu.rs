@@ -184,7 +184,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
     /// When a VM-Exit happens when guest's vCpu is running,
     /// the control flow will be redirected to this function through `return_run_guest`.
     #[inline(never)]
-    unsafe fn run_guest(&mut self) -> usize {
+    unsafe fn run_guest_origin(&mut self) -> usize {
         unsafe {
             // Save function call context.
             core::arch::asm!(
@@ -214,6 +214,34 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             );
         }
         exit_reason
+    }
+
+    #[naked]
+    unsafe extern "C" fn run_guest(&mut self) -> usize {
+        unsafe {
+            core::arch::naked_asm!(
+                // Save host context.
+                save_regs_to_stack!(),
+                // Save current host stack top to `self.host_stack_top`.
+                "mov x9, sp",
+                "add x0, x0, {host_stack_top_offset}",
+                "str x9, [x0]",
+                // Go to `context_vm_entry`
+                "b context_vm_entry",
+                // Panic if the control flow comes back here.
+                "b {run_guest_panic}",
+                host_stack_top_offset = const core::mem::size_of::<TrapFrame>(),
+                run_guest_panic = sym Self::run_guest_panic,
+            );
+        }
+    }
+
+    /// This function is called when the control flow comes back to `run_guest`.
+    /// 
+    /// This function may fail as the stack may have been corrupted when this function is called.
+    /// But who cares?
+    unsafe fn run_guest_panic() {
+        panic!("run_guest_panic");
     }
 
     /// Restores guest system control registers.
