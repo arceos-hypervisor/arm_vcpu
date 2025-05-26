@@ -215,7 +215,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
     ///
     /// This function may fail as the stack may have been corrupted when this function is called.
     /// But we won't handle it here for now.
-    unsafe fn run_guest_panic() {
+    unsafe fn run_guest_panic() -> ! {
         panic!("run_guest_panic");
     }
 
