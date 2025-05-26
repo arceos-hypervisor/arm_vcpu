@@ -197,6 +197,9 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
                 // Save host context.
                 save_regs_to_stack!(),
                 // Save current host stack top to `self.host_stack_top`.
+                //
+                // 'extern "C"' here specifies the aapcs64 calling convention, according to which
+                // the first and only parameter, the pointer of self, should be in x0:
                 "mov x9, sp",
                 "add x0, x0, {host_stack_top_offset}",
                 "str x9, [x0]",
