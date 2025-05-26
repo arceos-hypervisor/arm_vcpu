@@ -183,41 +183,9 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
     ///
     /// When a VM-Exit happens when guest's vCpu is running,
     /// the control flow will be redirected to this function through `return_run_guest`.
-    #[inline(never)]
-    unsafe fn run_guest_origin(&mut self) -> usize {
-        unsafe {
-            // Save function call context.
-            core::arch::asm!(
-                // Save host context.
-                save_regs_to_stack!(),
-                "mov x9, sp",
-                "mov x10, x11",
-                // Save current host stack top in the `Aarch64VCpu` struct.
-                "str x9, [x10]",
-                "mov x0, x11",
-                "b context_vm_entry",
-                // in(reg) here is dangerous, because the compiler may use the register we want to use, creating a conflict.
-                in("x11") &self.host_stack_top as *const _ as usize,
-                options(nostack)
-            );
-        }
-
-        // When `vmexit_trampoline` returns, it will come back here, with its return value stored in x0. Extract it and return `run_guest`.
-        // Related PR: https://github.com/arceos-hypervisor/arm_vcpu/pull/26
-        // Related issue: https://github.com/arceos-hypervisor/arm_vcpu/issues/22
-        // This is a temporary workaround for the issue.
-        let exit_reason: usize;
-        unsafe {
-            core::arch::asm!(
-                "mov {}, x0",
-                out(reg) exit_reason
-            );
-        }
-        exit_reason
-    }
-
     #[naked]
     unsafe extern "C" fn run_guest(&mut self) -> usize {
+        // fixes: https://github.com/arceos-hypervisor/arm_vcpu/issues/22
         unsafe {
             core::arch::naked_asm!(
                 // Save host context.
@@ -236,10 +204,11 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
         }
     }
 
-    /// This function is called when the control flow comes back to `run_guest`.
+    /// This function is called when the control flow comes back to `run_guest`. To provide a error
+    /// message for debugging purposes.
     /// 
     /// This function may fail as the stack may have been corrupted when this function is called.
-    /// But who cares?
+    /// But we won't handle it here for now.
     unsafe fn run_guest_panic() {
         panic!("run_guest_panic");
     }
