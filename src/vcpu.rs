@@ -185,7 +185,13 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
     /// the control flow will be redirected to this function through `return_run_guest`.
     #[naked]
     unsafe extern "C" fn run_guest(&mut self) -> usize {
-        // fixes: https://github.com/arceos-hypervisor/arm_vcpu/issues/22
+        // Fixes: https://github.com/arceos-hypervisor/arm_vcpu/issues/22
+        //
+        // The original issue seems to be caused by an unexpected compiler optimization that takes
+        // the dummy return value `0` of `run_guest` as the actual return value. By replacing the
+        // original `run_guest` with the current naked one, we eliminate the dummy code path of the
+        // original version, and ensure that the compiler does not perform any unexpected return
+        // value optimization.
         unsafe {
             core::arch::naked_asm!(
                 // Save host context.
@@ -194,9 +200,9 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
                 "mov x9, sp",
                 "add x0, x0, {host_stack_top_offset}",
                 "str x9, [x0]",
-                // Go to `context_vm_entry`
+                // Go to `context_vm_entry`.
                 "b context_vm_entry",
-                // Panic if the control flow comes back here.
+                // Panic if the control flow comes back here, which should never happen.
                 "b {run_guest_panic}",
                 host_stack_top_offset = const core::mem::size_of::<TrapFrame>(),
                 run_guest_panic = sym Self::run_guest_panic,
