@@ -206,7 +206,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
 
     /// This function is called when the control flow comes back to `run_guest`. To provide a error
     /// message for debugging purposes.
-    /// 
+    ///
     /// This function may fail as the stack may have been corrupted when this function is called.
     /// But we won't handle it here for now.
     unsafe fn run_guest_panic() {
