@@ -64,6 +64,12 @@ impl<H: AxVCpuHal> AxArchPerCpu for Aarch64PerCpu<H> {
                 + HCR_EL2::TSC::EnableTrapEl1SmcToEl2,
         );
 
+        unsafe  {
+            core::arch::asm! {
+                "msr ich_hcr_el2, #0x1",
+            }
+        }
+
         Ok(())
     }
 
