@@ -3,14 +3,13 @@ use core::marker::PhantomData;
 use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SP_EL0, SPSR_EL1, VTCR_EL2};
 use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 
-use axaddrspace::{GuestPhysAddr, HostPhysAddr};
-use axerrno::AxResult;
-use axvcpu::{AxVCpuExitReason, AxVCpuHal};
-
 use crate::TrapFrame;
 use crate::context_frame::GuestSystemRegisters;
 use crate::exception::{TrapKind, handle_exception_sync};
 use crate::exception_utils::exception_class_value;
+use axaddrspace::{GuestPhysAddr, HostPhysAddr};
+use axerrno::AxResult;
+use axvcpu::{AxVCpuExitReason, AxVCpuHal};
 
 #[percpu::def_percpu]
 static HOST_SP_EL0: u64 = 0;
@@ -121,6 +120,11 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
     fn set_gpr(&mut self, idx: usize, val: usize) {
         self.ctx.set_gpr(idx, val);
     }
+
+    fn inject_interrupt(&mut self, vector: usize) -> AxResult {
+        axvisor_api::arch::hardware_inject_virtual_interrupt(vector as u8);
+        Ok(())
+    }
 }
 
 // Private function
@@ -151,9 +155,13 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             + VTCR_EL2::SL0.val(0b01)
             + VTCR_EL2::T0SZ.val(64 - 39))
         .into();
-        self.guest_system_regs.hcr_el2 =
-            (HCR_EL2::VM::Enable + HCR_EL2::RW::EL1IsAarch64 + HCR_EL2::TSC::EnableTrapEl1SmcToEl2)
-                .into();
+        self.guest_system_regs.hcr_el2 = (HCR_EL2::VM::Enable
+            + HCR_EL2::RW::EL1IsAarch64
+            + HCR_EL2::IMO::EnableVirtualIRQ
+            + HCR_EL2::FMO::EnableVirtualFIQ
+            + HCR_EL2::TSC::EnableTrapEl1SmcToEl2
+            + HCR_EL2::RW::EL1IsAarch64)
+            .into();
         // self.system_regs.hcr_el2 |= 1<<27;
         // + HCR_EL2::IMO::EnableVirtualIRQ).into();
 
