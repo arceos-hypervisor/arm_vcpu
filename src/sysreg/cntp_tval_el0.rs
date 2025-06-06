@@ -2,12 +2,10 @@ extern crate alloc;
 
 use aarch64_sysreg::SystemRegType;
 
-use aarch64_cpu::registers::{CNTPCT_EL0, Readable};
 
-use axaddrspace::{
-    GuestPhysAddrRange,
-    device::{AccessWidth, DeviceAddrRange, SysRegAddr, SysRegAddrRange},
-};
+use axaddrspace::
+    device::{AccessWidth, DeviceAddrRange, SysRegAddr, SysRegAddrRange}
+;
 use axdevice_base::{BaseDeviceOps, EmuDeviceType};
 use axerrno::AxResult;
 use axvisor_api::time::{current_time_nanos, register_timer};

@@ -1,9 +1,8 @@
 use aarch64_sysreg::SystemRegType;
 
-use axaddrspace::GuestPhysAddrRange;
 use axaddrspace::device::{AccessWidth, DeviceAddrRange, SysRegAddr, SysRegAddrRange};
 use axdevice_base::EmuDeviceType;
-use axdevice_base::{BaseDeviceOps, BaseMmioDeviceOps};
+use axdevice_base::BaseDeviceOps;
 use axerrno::AxResult;
 
 impl BaseDeviceOps<SysRegAddrRange> for SysCntpCtlEl0 {
@@ -20,8 +19,8 @@ impl BaseDeviceOps<SysRegAddrRange> for SysCntpCtlEl0 {
 
     fn handle_read(
         &self,
-        addr: <SysRegAddrRange as DeviceAddrRange>::Addr,
-        width: AccessWidth,
+        _addr: <SysRegAddrRange as DeviceAddrRange>::Addr,
+        _width: AccessWidth,
     ) -> AxResult<usize> {
         todo!()
     }
@@ -29,7 +28,7 @@ impl BaseDeviceOps<SysRegAddrRange> for SysCntpCtlEl0 {
     fn handle_write(
         &self,
         addr: <SysRegAddrRange as DeviceAddrRange>::Addr,
-        width: AccessWidth,
+        _width: AccessWidth,
         val: usize,
     ) -> AxResult {
         info!("Write to emulator register: {:?}, value: {}", addr, val);

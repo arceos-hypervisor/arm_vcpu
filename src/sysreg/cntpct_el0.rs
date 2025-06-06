@@ -2,10 +2,9 @@ use aarch64_sysreg::SystemRegType;
 
 use aarch64_cpu::registers::{CNTPCT_EL0, Readable};
 
-use axaddrspace::{
-    GuestPhysAddrRange,
-    device::{AccessWidth, DeviceAddrRange, SysRegAddr, SysRegAddrRange},
-};
+use axaddrspace::
+    device::{AccessWidth, DeviceAddrRange, SysRegAddr, SysRegAddrRange}
+;
 
 use axdevice_base::{BaseDeviceOps, EmuDeviceType};
 
@@ -25,8 +24,8 @@ impl BaseDeviceOps<SysRegAddrRange> for SysCntpctEl0 {
 
     fn handle_read(
         &self,
-        addr: <SysRegAddrRange as DeviceAddrRange>::Addr,
-        width: AccessWidth,
+        _addr: <SysRegAddrRange as DeviceAddrRange>::Addr,
+        _width: AccessWidth,
     ) -> AxResult<usize> {
         Ok(CNTPCT_EL0.get() as usize)
     }
@@ -34,7 +33,7 @@ impl BaseDeviceOps<SysRegAddrRange> for SysCntpctEl0 {
     fn handle_write(
         &self,
         addr: <SysRegAddrRange as DeviceAddrRange>::Addr,
-        width: AccessWidth,
+        _width: AccessWidth,
         val: usize,
     ) -> AxResult {
         info!("Write to emulator register: {:?}, value: {}", addr, val);
