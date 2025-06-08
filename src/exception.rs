@@ -13,7 +13,7 @@ use axaddrspace::device::{AccessWidth, SysRegAddr};
 use axerrno::{AxError, AxResult};
 use axvcpu::AxVCpuExitReason;
 use aarch64_cpu::registers::{ESR_EL2, HCR_EL2, Readable, SCTLR_EL1, VTCR_EL2, VTTBR_EL2};
-
+use log::error;
 
 numeric_enum_macro::numeric_enum! {
 #[repr(u8)]
@@ -287,6 +287,14 @@ fn current_el_irq_handler(_tf: &mut TrapFrame) {
 /// Handles synchronous exceptions that occur from the current exception level.
 #[unsafe(no_mangle)]
 fn current_el_sync_handler(tf: &mut TrapFrame) {
+    let esr = ESR_EL2.extract();
+    let ec = ESR_EL2.read(ESR_EL2::EC);
+    let iss = ESR_EL2.read(ESR_EL2::ISS);
+
+    error!("ESR_EL2: {:#x}", esr.get());
+    error!("Exception Class: {:#x}", ec);
+    error!("Instruction Specific Syndrome: {:#x}", iss);
+
     panic!(
         "Unhandled synchronous exception from current EL: {:#x?}",
         tf
