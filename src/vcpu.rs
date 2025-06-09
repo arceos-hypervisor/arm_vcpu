@@ -144,6 +144,8 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
         CNTHCTL_EL2.modify(CNTHCTL_EL2::EL1PCEN::SET + CNTHCTL_EL2::EL1PCTEN::SET);
         self.guest_system_regs.cntvoff_el2 = 0;
         self.guest_system_regs.cntkctl_el1 = 0;
+        self.guest_system_regs.cnthctl_el2 =
+            (CNTHCTL_EL2::EL1PCEN::SET + CNTHCTL_EL2::EL1PCTEN::SET).into();
 
         self.guest_system_regs.sctlr_el1 = 0x30C50830;
         self.guest_system_regs.pmcr_el0 = 0;
@@ -157,7 +159,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
         .into();
         self.guest_system_regs.hcr_el2 = (HCR_EL2::VM::Enable
             + HCR_EL2::RW::EL1IsAarch64
-            + HCR_EL2::IMO::EnableVirtualIRQ
+            // + HCR_EL2::IMO::EnableVirtualIRQ
             + HCR_EL2::FMO::EnableVirtualFIQ
             + HCR_EL2::TSC::EnableTrapEl1SmcToEl2
             + HCR_EL2::RW::EL1IsAarch64)
@@ -280,12 +282,25 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             restore_host_sp_el0();
         }
 
-        match exit_reason {
+        let result = match exit_reason {
             TrapKind::Synchronous => handle_exception_sync(&mut self.ctx),
             TrapKind::Irq => Ok(AxVCpuExitReason::ExternalInterrupt {
                 vector: H::irq_fetch() as _,
             }),
             _ => panic!("Unhandled exception {:?}", exit_reason),
+        };
+
+        match result {
+            Ok(AxVCpuExitReason::MmioRead {
+                addr,
+                width,
+                reg,
+                reg_width,
+            }) if false => {}
+            Ok(AxVCpuExitReason::MmioWrite { addr, width, data }) if false => {}
+            r => return r,
         }
+
+        Ok(AxVCpuExitReason::Nothing)
     }
 }
