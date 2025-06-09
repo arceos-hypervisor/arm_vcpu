@@ -67,7 +67,7 @@ impl<H: AxVCpuHal> AxArchPerCpu for Aarch64PerCpu<H> {
         // Note that `ICH_HCR_EL2` is not the same as `HCR_EL2`.
         //
         // Enable the virtual CPU interface operation.
-        unsafe  {
+        unsafe {
             core::arch::asm! {
                 "msr ich_hcr_el2, {value:x}",
                 value = in(reg) 1,

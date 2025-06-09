@@ -8,11 +8,13 @@ use crate::exception_utils::{
     exception_sysreg_direction_write, exception_sysreg_gpr,
 };
 
-use axaddrspace::GuestPhysAddr;
-use axaddrspace::device::{AccessWidth, SysRegAddr};
+use aarch64_cpu::registers::{ESR_EL2, HCR_EL2, Readable, SCTLR_EL1, VTCR_EL2, VTTBR_EL2};
+use axaddrspace::{
+    GuestPhysAddr,
+    device::{AccessWidth, SysRegAddr},
+};
 use axerrno::{AxError, AxResult};
 use axvcpu::AxVCpuExitReason;
-use aarch64_cpu::registers::{ESR_EL2, HCR_EL2, Readable, SCTLR_EL1, VTCR_EL2, VTTBR_EL2};
 use log::error;
 
 numeric_enum_macro::numeric_enum! {
