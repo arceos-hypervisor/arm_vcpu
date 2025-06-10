@@ -121,6 +121,11 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
     fn set_gpr(&mut self, idx: usize, val: usize) {
         self.ctx.set_gpr(idx, val);
     }
+
+    fn set_return_value(&mut self, val: usize) {
+        // Return value is stored in x0.
+        self.ctx.set_argument(val);
+    }
 }
 
 // Private function
