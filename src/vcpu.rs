@@ -125,6 +125,11 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
         axvisor_api::arch::hardware_inject_virtual_interrupt(vector as u8);
         Ok(())
     }
+
+    fn set_return_value(&mut self, val: usize) {
+        // Return value is stored in x0.
+        self.ctx.set_argument(val);
+    }
 }
 
 // Private function
