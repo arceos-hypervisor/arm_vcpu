@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 
 use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SP_EL0, SPSR_EL1, VTCR_EL2};
+use axaddrspace::device::SysRegAddr;
 use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 
 use crate::TrapFrame;
@@ -303,14 +304,46 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             _ => panic!("Unhandled exception {:?}", exit_reason),
         };
 
+        const SYSREG_ICC_SGI1R_EL1: SysRegAddr = SysRegAddr::new(0x3A_3016); // ICC_SGI1R_EL1
         match result {
-            Ok(AxVCpuExitReason::MmioRead {
-                addr,
-                width,
-                reg,
-                reg_width,
-            }) if false => {}
-            Ok(AxVCpuExitReason::MmioWrite { addr, width, data }) if false => {}
+            Ok(AxVCpuExitReason::SysRegWrite { addr, value }) if addr == SYSREG_ICC_SGI1R_EL1 => {
+                debug!("arm_vcpu ICC_SGI1R_EL1 write: {:#x}", value);
+
+                // TODO: support RangeSelector
+
+                let intid = (value >> 24) & 0b1111;
+                let irm = ((value >> 40) & 0b1) != 0;
+
+                // IRM == 1 => send to all except self
+                if irm {
+                    debug!("arm_vcpu ICC_SGI1R_EL1 write: irm == 1, send to all except self");
+
+                    return Ok(AxVCpuExitReason::SendIPI {
+                        target_cpu: 0,
+                        target_cpu_aux: 0,
+                        send_to_all: true,
+                        send_to_self: false,
+                        vector: intid,
+                    });
+                }
+
+                let aff3 = (value >> 48) & 0xff;
+                let aff2 = (value >> 32) & 0xff;
+                let aff1 = (value >> 16) & 0xff;
+                let target_list = (value & 0xffff);
+
+                debug!(
+                    "arm_vcpu ICC_SGI1R_EL1 write: aff3:{:#x} aff2:{:#x} aff1:{:#x} intid:{:#x} target_list:{:#x}",
+                    aff3, aff2, aff1, intid, target_list
+                );
+                return Ok(AxVCpuExitReason::SendIPI {
+                    target_cpu: (aff3 << 24) | (aff2 << 16) | (aff1 << 8),
+                    target_cpu_aux: target_list,
+                    send_to_all: false,
+                    send_to_self: false,
+                    vector: intid,
+                });
+            }
             r => return r,
         }
 

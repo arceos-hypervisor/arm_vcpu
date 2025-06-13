@@ -3,7 +3,10 @@ extern crate alloc;
 use core::result;
 
 use alloc::{sync::Arc, vec, vec::Vec};
-use arm_vgic::{v3::{gits::Gits, vgicd::VGicD, vgicr::VGicR}, vgic};
+use arm_vgic::{
+    v3::{gits::Gits, vgicd::VGicD, vgicr::VGicR},
+    vgic,
+};
 use axaddrspace::{GuestPhysAddr, HostPhysAddr};
 use axdevice_base::BaseMmioDeviceOps;
 
@@ -44,7 +47,11 @@ pub fn get_gic_devices(config: GicDeviceConfig) -> Vec<Arc<dyn BaseMmioDeviceOps
     let mut gicd = VGicD::new(config.gicd_base, None);
 
     for assigned_spi in config.assigned_spis {
-        gicd.assign_irq(assigned_spi.spi, assigned_spi.target_cpu_phys_id, assigned_spi.target_cpu_affinity);
+        gicd.assign_irq(
+            assigned_spi.spi,
+            assigned_spi.target_cpu_phys_id,
+            assigned_spi.target_cpu_affinity,
+        );
     }
 
     results.push(Arc::new(gicd));
@@ -62,12 +69,10 @@ pub fn get_gic_devices(config: GicDeviceConfig) -> Vec<Arc<dyn BaseMmioDeviceOps
 
     results
 
-
     // let mut vgicd = VGicD::new(0x0800_0000.into(), None);
 
     // vgicd.assigned_irqs.set(0x28, true);
     // // vgicd.assigned_irqs.set(0x1, true);
-
 
     // let vgicr0 = VGicR::new(0x080a_0000.into(), None, 0);
     // let vgicr1 = VGicR::new(0x080c_0000.into(), None, 1);
