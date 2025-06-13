@@ -149,22 +149,22 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
 
         self.guest_system_regs.sctlr_el1 = 0x30C50830;
         self.guest_system_regs.pmcr_el0 = 0;
-        // self.guest_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_40B_1TB
-        //     + VTCR_EL2::TG0::Granule4KB
-        //     + VTCR_EL2::SH0::Inner
-        //     + VTCR_EL2::ORGN0::NormalWBRAWA
-        //     + VTCR_EL2::IRGN0::NormalWBRAWA
-        //     + VTCR_EL2::SL0.val(0b01)
-        //     + VTCR_EL2::T0SZ.val(64 - 39))
-        // .into();
-        self.guest_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_48B_256TB
+        self.guest_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_40B_1TB
             + VTCR_EL2::TG0::Granule4KB
             + VTCR_EL2::SH0::Inner
             + VTCR_EL2::ORGN0::NormalWBRAWA
             + VTCR_EL2::IRGN0::NormalWBRAWA
-            + VTCR_EL2::SL0.val(0b10) // 0b10: If VTCR_EL2.TG0 is 0b00 (4KB granule):start at level 0.
-            + VTCR_EL2::T0SZ.val(64-48))
+            + VTCR_EL2::SL0.val(0b01)
+            + VTCR_EL2::T0SZ.val(64 - 39))
         .into();
+        // self.guest_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_48B_256TB
+        //     + VTCR_EL2::TG0::Granule4KB
+        //     + VTCR_EL2::SH0::Inner
+        //     + VTCR_EL2::ORGN0::NormalWBRAWA
+        //     + VTCR_EL2::IRGN0::NormalWBRAWA
+        //     + VTCR_EL2::SL0.val(0b10) // 0b10: If VTCR_EL2.TG0 is 0b00 (4KB granule):start at level 0.
+        //     + VTCR_EL2::T0SZ.val(64-48))
+        // .into();
         self.guest_system_regs.hcr_el2 = (HCR_EL2::VM::Enable
             + HCR_EL2::RW::EL1IsAarch64
             // + HCR_EL2::IMO::EnableVirtualIRQ
