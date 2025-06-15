@@ -307,7 +307,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
         const SYSREG_ICC_SGI1R_EL1: SysRegAddr = SysRegAddr::new(0x3A_3016); // ICC_SGI1R_EL1
         match result {
             Ok(AxVCpuExitReason::SysRegWrite { addr, value }) if addr == SYSREG_ICC_SGI1R_EL1 => {
-                debug!("arm_vcpu ICC_SGI1R_EL1 write: {:#x}", value);
+                trace!("arm_vcpu ICC_SGI1R_EL1 write: {:#x}", value);
 
                 // TODO: support RangeSelector
 
@@ -316,7 +316,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
 
                 // IRM == 1 => send to all except self
                 if irm {
-                    debug!("arm_vcpu ICC_SGI1R_EL1 write: irm == 1, send to all except self");
+                    trace!("arm_vcpu ICC_SGI1R_EL1 write: irm == 1, send to all except self");
 
                     return Ok(AxVCpuExitReason::SendIPI {
                         target_cpu: 0,
@@ -332,7 +332,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
                 let aff1 = (value >> 16) & 0xff;
                 let target_list = (value & 0xffff);
 
-                debug!(
+                trace!(
                     "arm_vcpu ICC_SGI1R_EL1 write: aff3:{:#x} aff2:{:#x} aff1:{:#x} intid:{:#x} target_list:{:#x}",
                     aff3, aff2, aff1, intid, target_list
                 );
