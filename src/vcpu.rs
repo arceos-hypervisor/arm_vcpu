@@ -121,10 +121,10 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
         self.ctx.set_gpr(idx, val);
     }
 
-    fn inject_interrupt(&mut self, vector: usize) -> AxResult {
-        axvisor_api::arch::hardware_inject_virtual_interrupt(vector as u8);
-        Ok(())
-    }
+    // fn inject_interrupt(&mut self, vector: usize) -> AxResult {
+    //     axvisor_api::arch::hardware_inject_virtual_interrupt(vector as u8);
+    //     Ok(())
+    // }
 }
 
 // Private function
