@@ -10,11 +10,14 @@ mod context_frame;
 #[macro_use]
 mod exception_utils;
 mod exception;
+pub mod gic;
 mod pcpu;
 mod smc;
+mod sysreg;
 mod vcpu;
 
 pub use self::pcpu::Aarch64PerCpu;
+pub use self::sysreg::get_sysreg_device;
 pub use self::vcpu::{Aarch64VCpu, Aarch64VCpuCreateConfig};
 
 /// context frame for aarch64

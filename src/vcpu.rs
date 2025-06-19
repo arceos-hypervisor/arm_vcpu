@@ -1,16 +1,16 @@
 use core::marker::PhantomData;
 
 use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SP_EL0, SPSR_EL1, VTCR_EL2};
+use axaddrspace::device::SysRegAddr;
 use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
-
-use axaddrspace::{GuestPhysAddr, HostPhysAddr};
-use axerrno::AxResult;
-use axvcpu::{AxVCpuExitReason, AxVCpuHal};
 
 use crate::TrapFrame;
 use crate::context_frame::GuestSystemRegisters;
 use crate::exception::{TrapKind, handle_exception_sync};
 use crate::exception_utils::exception_class_value;
+use axaddrspace::{GuestPhysAddr, HostPhysAddr};
+use axerrno::AxResult;
+use axvcpu::{AxVCpuExitReason, AxVCpuHal};
 
 #[percpu::def_percpu]
 static HOST_SP_EL0: u64 = 0;
@@ -121,6 +121,16 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
     fn set_gpr(&mut self, idx: usize, val: usize) {
         self.ctx.set_gpr(idx, val);
     }
+
+    fn inject_interrupt(&mut self, vector: usize) -> AxResult {
+        axvisor_api::arch::hardware_inject_virtual_interrupt(vector as u8);
+        Ok(())
+    }
+
+    fn set_return_value(&mut self, val: usize) {
+        // Return value is stored in x0.
+        self.ctx.set_argument(val);
+    }
 }
 
 // Private function
@@ -140,20 +150,34 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
         CNTHCTL_EL2.modify(CNTHCTL_EL2::EL1PCEN::SET + CNTHCTL_EL2::EL1PCTEN::SET);
         self.guest_system_regs.cntvoff_el2 = 0;
         self.guest_system_regs.cntkctl_el1 = 0;
+        self.guest_system_regs.cnthctl_el2 =
+            (CNTHCTL_EL2::EL1PCEN::SET + CNTHCTL_EL2::EL1PCTEN::SET).into();
 
         self.guest_system_regs.sctlr_el1 = 0x30C50830;
         self.guest_system_regs.pmcr_el0 = 0;
-        self.guest_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_40B_1TB
+        // self.guest_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_40B_1TB
+        //     + VTCR_EL2::TG0::Granule4KB
+        //     + VTCR_EL2::SH0::Inner
+        //     + VTCR_EL2::ORGN0::NormalWBRAWA
+        //     + VTCR_EL2::IRGN0::NormalWBRAWA
+        //     + VTCR_EL2::SL0.val(0b01)
+        //     + VTCR_EL2::T0SZ.val(64 - 39))
+        // .into();
+        self.guest_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_48B_256TB
             + VTCR_EL2::TG0::Granule4KB
             + VTCR_EL2::SH0::Inner
             + VTCR_EL2::ORGN0::NormalWBRAWA
             + VTCR_EL2::IRGN0::NormalWBRAWA
-            + VTCR_EL2::SL0.val(0b01)
-            + VTCR_EL2::T0SZ.val(64 - 39))
+            + VTCR_EL2::SL0.val(0b10) // 0b10: If VTCR_EL2.TG0 is 0b00 (4KB granule):start at level 0.
+            + VTCR_EL2::T0SZ.val(64-48))
         .into();
-        self.guest_system_regs.hcr_el2 =
-            (HCR_EL2::VM::Enable + HCR_EL2::RW::EL1IsAarch64 + HCR_EL2::TSC::EnableTrapEl1SmcToEl2)
-                .into();
+        self.guest_system_regs.hcr_el2 = (HCR_EL2::VM::Enable
+            + HCR_EL2::RW::EL1IsAarch64
+            // + HCR_EL2::IMO::EnableVirtualIRQ
+            + HCR_EL2::FMO::EnableVirtualFIQ
+            + HCR_EL2::TSC::EnableTrapEl1SmcToEl2
+            + HCR_EL2::RW::EL1IsAarch64)
+            .into();
         // self.system_regs.hcr_el2 |= 1<<27;
         // + HCR_EL2::IMO::EnableVirtualIRQ).into();
 
@@ -272,12 +296,57 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             restore_host_sp_el0();
         }
 
-        match exit_reason {
+        let result = match exit_reason {
             TrapKind::Synchronous => handle_exception_sync(&mut self.ctx),
             TrapKind::Irq => Ok(AxVCpuExitReason::ExternalInterrupt {
                 vector: H::irq_fetch() as _,
             }),
             _ => panic!("Unhandled exception {:?}", exit_reason),
+        };
+
+        const SYSREG_ICC_SGI1R_EL1: SysRegAddr = SysRegAddr::new(0x3A_3016); // ICC_SGI1R_EL1
+        match result {
+            Ok(AxVCpuExitReason::SysRegWrite { addr, value }) if addr == SYSREG_ICC_SGI1R_EL1 => {
+                debug!("arm_vcpu ICC_SGI1R_EL1 write: {:#x}", value);
+
+                // TODO: support RangeSelector
+
+                let intid = (value >> 24) & 0b1111;
+                let irm = ((value >> 40) & 0b1) != 0;
+
+                // IRM == 1 => send to all except self
+                if irm {
+                    debug!("arm_vcpu ICC_SGI1R_EL1 write: irm == 1, send to all except self");
+
+                    return Ok(AxVCpuExitReason::SendIPI {
+                        target_cpu: 0,
+                        target_cpu_aux: 0,
+                        send_to_all: true,
+                        send_to_self: false,
+                        vector: intid,
+                    });
+                }
+
+                let aff3 = (value >> 48) & 0xff;
+                let aff2 = (value >> 32) & 0xff;
+                let aff1 = (value >> 16) & 0xff;
+                let target_list = (value & 0xffff);
+
+                debug!(
+                    "arm_vcpu ICC_SGI1R_EL1 write: aff3:{:#x} aff2:{:#x} aff1:{:#x} intid:{:#x} target_list:{:#x}",
+                    aff3, aff2, aff1, intid, target_list
+                );
+                return Ok(AxVCpuExitReason::SendIPI {
+                    target_cpu: (aff3 << 24) | (aff2 << 16) | (aff1 << 8),
+                    target_cpu_aux: target_list,
+                    send_to_all: false,
+                    send_to_self: false,
+                    vector: intid,
+                });
+            }
+            r => return r,
         }
+
+        Ok(AxVCpuExitReason::Nothing)
     }
 }
