@@ -183,7 +183,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
     ///
     /// When a VM-Exit happens when guest's vCpu is running,
     /// the control flow will be redirected to this function through `return_run_guest`.
-    #[naked]
+    #[unsafe(naked)]
     unsafe extern "C" fn run_guest(&mut self) -> usize {
         // Fixes: https://github.com/arceos-hypervisor/arm_vcpu/issues/22
         //
