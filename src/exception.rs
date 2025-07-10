@@ -325,20 +325,18 @@ fn current_el_sync_handler(tf: &mut TrapFrame) {
 ///
 /// - This function is not typically called directly from Rust code. Instead, it is
 ///   invoked as part of the low-level hypervisor or VM exit handling routines.
-#[naked]
+#[unsafe(naked)]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn vmexit_trampoline() -> ! {
-    unsafe {
-        core::arch::naked_asm!(
-            // Curretly `sp` points to the base address of `Aarch64VCpu.ctx`, which stores guest's `TrapFrame`.
-            "add x9, sp, 34 * 8", // Skip the exception frame.
-            // Currently `x9` points to `&Aarch64VCpu.host_stack_top`, see `run_guest()` in vcpu.rs.
-            "ldr x10, [x9]", // Get `host_stack_top` value from `&Aarch64VCpu.host_stack_top`.
-            "mov sp, x10",   // Set `sp` as the host stack top.
-            restore_regs_from_stack!(), // Restore host function context frame.
-            "ret", // Control flow is handed back to Aarch64VCpu.run(), simulating the normal return of the `run_guest` function.
-        )
-    }
+    core::arch::naked_asm!(
+        // Curretly `sp` points to the base address of `Aarch64VCpu.ctx`, which stores guest's `TrapFrame`.
+        "add x9, sp, 34 * 8", // Skip the exception frame.
+        // Currently `x9` points to `&Aarch64VCpu.host_stack_top`, see `run_guest()` in vcpu.rs.
+        "ldr x10, [x9]", // Get `host_stack_top` value from `&Aarch64VCpu.host_stack_top`.
+        "mov sp, x10",   // Set `sp` as the host stack top.
+        restore_regs_from_stack!(), // Restore host function context frame.
+        "ret", // Control flow is handed back to Aarch64VCpu.run(), simulating the normal return of the `run_guest` function.
+    )
 }
 
 /// Deal with invalid aarch64 exception.
