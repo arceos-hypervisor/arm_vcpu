@@ -66,7 +66,7 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
 
     type SetupConfig = ();
 
-    fn new(config: Self::CreateConfig) -> AxResult<Self> {
+    fn new(vm_id: usize, vcpu_id: usize, config: Self::CreateConfig) -> AxResult<Self> {
         let mut ctx = TrapFrame::default();
         ctx.set_argument(config.dtb_addr);
 

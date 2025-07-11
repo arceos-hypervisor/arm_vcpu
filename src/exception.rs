@@ -181,6 +181,7 @@ fn handle_data_abort(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason
         width,
         reg,
         reg_width,
+        signed_ext: false,
     })
 }
 
