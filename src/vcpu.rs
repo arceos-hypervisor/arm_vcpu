@@ -1,7 +1,6 @@
 use core::marker::PhantomData;
 
-use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SP_EL0, SPSR_EL1, VTCR_EL2};
-use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
+use aarch64_cpu::registers::*;
 
 use axaddrspace::{GuestPhysAddr, HostPhysAddr};
 use axerrno::AxResult;

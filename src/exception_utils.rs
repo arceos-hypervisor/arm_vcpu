@@ -1,5 +1,4 @@
-use aarch64_cpu::registers::{ESR_EL2, FAR_EL2, PAR_EL1};
-use tock_registers::interfaces::*;
+use aarch64_cpu::registers::*;
 
 use axaddrspace::GuestPhysAddr;
 use axerrno::{AxResult, ax_err};

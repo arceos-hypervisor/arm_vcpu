@@ -1,7 +1,6 @@
 use core::{cell::OnceCell, marker::PhantomData};
 
 use aarch64_cpu::registers::*;
-use tock_registers::interfaces::ReadWriteable;
 
 use axerrno::AxResult;
 use axvcpu::{AxArchPerCpu, AxVCpuHal};
