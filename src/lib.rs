@@ -10,7 +10,6 @@ mod context_frame;
 #[macro_use]
 mod exception_utils;
 mod exception;
-pub mod gic;
 mod pcpu;
 mod smc;
 mod sysreg;

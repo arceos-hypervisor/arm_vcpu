@@ -330,7 +330,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
                 let aff3 = (value >> 48) & 0xff;
                 let aff2 = (value >> 32) & 0xff;
                 let aff1 = (value >> 16) & 0xff;
-                let target_list = (value & 0xffff);
+                let target_list = value & 0xffff;
 
                 debug!(
                     "arm_vcpu ICC_SGI1R_EL1 write: aff3:{:#x} aff2:{:#x} aff1:{:#x} intid:{:#x} target_list:{:#x}",

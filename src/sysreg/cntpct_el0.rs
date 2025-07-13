@@ -13,7 +13,7 @@ use axerrno::AxResult;
 
 impl BaseDeviceOps<SysRegAddrRange> for SysCntpctEl0 {
     fn emu_type(&self) -> EmuDeviceType {
-        EmuDeviceType::EmuDeviceTConsole
+        EmuDeviceType::Console
     }
 
     fn address_range(&self) -> SysRegAddrRange {

@@ -17,7 +17,7 @@ use core::time::Duration;
 
 impl BaseDeviceOps<SysRegAddrRange> for SysCntpTvalEl0 {
     fn emu_type(&self) -> EmuDeviceType {
-        EmuDeviceType::EmuDeviceTConsole
+        EmuDeviceType::Console
     }
 
     fn address_range(&self) -> SysRegAddrRange {
