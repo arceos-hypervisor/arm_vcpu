@@ -19,5 +19,3 @@ axaddrspace = { git = "https://github.com/arceos-hypervisor/axaddrspace.git" }
 axvcpu = { git = "https://github.com/arceos-hypervisor/axvcpu.git" }
 axdevice_base = { git = "https://github.com/arceos-hypervisor/axdevice_crates.git" }
 axvisor_api = { git = "https://github.com/arceos-hypervisor/axvisor_api.git" }
-
-arm_vgic = { git = "https://github.com/arceos-hypervisor/arm_vgic.git", features = ["vgicv3"]}
