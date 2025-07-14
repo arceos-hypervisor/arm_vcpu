@@ -1,5 +1,4 @@
-use core::arch::asm;
-use core::fmt::Formatter;
+use core::{arch::asm, fmt::Formatter};
 
 use aarch64_cpu::registers::*;
 

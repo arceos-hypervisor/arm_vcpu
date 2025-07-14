@@ -1,16 +1,15 @@
 use core::marker::PhantomData;
 
 use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SP_EL0, SPSR_EL1, VTCR_EL2};
-use axaddrspace::device::SysRegAddr;
+use axaddrspace::{GuestPhysAddr, HostPhysAddr, device::SysRegAddr};
+use axerrno::AxResult;
+use axvcpu::{AxArchVCpu, AxVCpuExitReason, AxVCpuHal};
 use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 
 use crate::TrapFrame;
 use crate::context_frame::GuestSystemRegisters;
 use crate::exception::{TrapKind, handle_exception_sync};
 use crate::exception_utils::exception_class_value;
-use axaddrspace::{GuestPhysAddr, HostPhysAddr};
-use axerrno::AxResult;
-use axvcpu::{AxArchVCpu, AxVCpuExitReason, AxVCpuHal};
 
 #[percpu::def_percpu]
 static HOST_SP_EL0: u64 = 0;
