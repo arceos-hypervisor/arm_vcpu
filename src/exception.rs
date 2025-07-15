@@ -15,6 +15,15 @@ use crate::exception_utils::{
     exception_sysreg_direction_write, exception_sysreg_gpr,
 };
 
+use aarch64_cpu::registers::{ESR_EL2, HCR_EL2, Readable, SCTLR_EL1, VTCR_EL2, VTTBR_EL2};
+use axaddrspace::{
+    GuestPhysAddr,
+    device::{AccessWidth, SysRegAddr},
+};
+use axerrno::{AxError, AxResult};
+use axvcpu::AxVCpuExitReason;
+use log::error;
+
 numeric_enum_macro::numeric_enum! {
 #[repr(u8)]
 #[derive(Debug)]
@@ -179,6 +188,7 @@ fn handle_data_abort(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason
         width,
         reg,
         reg_width,
+        signed_ext: false,
     })
 }
 
@@ -204,11 +214,14 @@ fn handle_system_register(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitR
     context_frame.set_exception_pc(val);
     if write {
         return Ok(AxVCpuExitReason::SysRegWrite {
-            addr,
+            addr: SysRegAddr::new(addr),
             value: context_frame.gpr(reg as usize) as u64,
         });
     }
-    Ok(AxVCpuExitReason::SysRegRead { addr, reg })
+    Ok(AxVCpuExitReason::SysRegRead {
+        addr: SysRegAddr::new(addr),
+        reg,
+    })
 }
 
 /// Handles HVC or SMC exceptions that serve as psci (Power State Coordination Interface) calls.
@@ -284,6 +297,14 @@ fn current_el_irq_handler(_tf: &mut TrapFrame) {
 /// Handles synchronous exceptions that occur from the current exception level.
 #[unsafe(no_mangle)]
 fn current_el_sync_handler(tf: &mut TrapFrame) {
+    let esr = ESR_EL2.extract();
+    let ec = ESR_EL2.read(ESR_EL2::EC);
+    let iss = ESR_EL2.read(ESR_EL2::ISS);
+
+    error!("ESR_EL2: {:#x}", esr.get());
+    error!("Exception Class: {:#x}", ec);
+    error!("Instruction Specific Syndrome: {:#x}", iss);
+
     panic!(
         "Unhandled synchronous exception from current EL: {:#x?}",
         tf
