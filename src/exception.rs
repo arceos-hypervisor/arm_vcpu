@@ -1,10 +1,3 @@
-use aarch64_cpu::registers::*;
-
-use axaddrspace::GuestPhysAddr;
-use axaddrspace::device::AccessWidth;
-use axerrno::{AxError, AxResult};
-use axvcpu::AxVCpuExitReason;
-
 use crate::TrapFrame;
 use crate::exception_utils::{
     exception_class, exception_class_value, exception_data_abort_access_is_write,
@@ -65,8 +58,7 @@ core::arch::global_asm!(
 ///
 /// # Arguments
 ///
-/// * `ctx` - A mutable reference to the `TrapFrame`, which contains the saved state of the
-///           guest VM's CPU registers at the time of the exception.
+/// * `ctx` - A mutable reference to the `TrapFrame`, which contains the saved state of the guest VM's CPU registers at the time of the exception.
 ///
 /// # Returns
 ///
@@ -302,8 +294,8 @@ fn current_el_sync_handler(tf: &mut TrapFrame) {
     let iss = ESR_EL2.read(ESR_EL2::ISS);
 
     error!("ESR_EL2: {:#x}", esr.get());
-    error!("Exception Class: {:#x}", ec);
-    error!("Instruction Specific Syndrome: {:#x}", iss);
+    error!("Exception Class: {ec:#x}");
+    error!("Instruction Specific Syndrome: {iss:#x}");
 
     panic!(
         "Unhandled synchronous exception from current EL: {:#x?}",

@@ -1,10 +1,9 @@
 use core::marker::PhantomData;
 
-use aarch64_cpu::registers::{CNTHCTL_EL2, HCR_EL2, SP_EL0, SPSR_EL1, VTCR_EL2};
+use aarch64_cpu::registers::*;
 use axaddrspace::{GuestPhysAddr, HostPhysAddr, device::SysRegAddr};
 use axerrno::AxResult;
 use axvcpu::{AxArchVCpu, AxVCpuExitReason, AxVCpuHal};
-use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 
 use crate::TrapFrame;
 use crate::context_frame::GuestSystemRegisters;
@@ -75,7 +74,7 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
 
     type SetupConfig = Aarch64VCpuSetupConfig;
 
-    fn new(vm_id: usize, vcpu_id: usize, config: Self::CreateConfig) -> AxResult<Self> {
+    fn new(_vm_id: usize, _vcpu_id: usize, config: Self::CreateConfig) -> AxResult<Self> {
         let mut ctx = TrapFrame::default();
         ctx.set_argument(config.dtb_addr);
 
@@ -94,13 +93,13 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
     }
 
     fn set_entry(&mut self, entry: GuestPhysAddr) -> AxResult {
-        debug!("set vcpu entry:{:?}", entry);
+        debug!("set vcpu entry:{entry:?}");
         self.set_elr(entry.as_usize());
         Ok(())
     }
 
     fn set_ept_root(&mut self, ept_root: HostPhysAddr) -> AxResult {
-        debug!("set vcpu ept root:{:#x}", ept_root);
+        debug!("set vcpu ept root:{ept_root:#x}");
         self.guest_system_regs.vttbr_el2 = ept_root.as_usize() as u64;
         Ok(())
     }
@@ -340,7 +339,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
                     return Ok(exit_reason);
                 }
 
-                return result;
+                result
             }
             Ok(AxVCpuExitReason::SysRegWrite { addr, value }) => {
                 if let Some(exit_reason) =
@@ -349,9 +348,9 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
                     return Ok(exit_reason);
                 }
 
-                return result;
+                result
             }
-            r => return r,
+            r => r,
         }
     }
 
@@ -369,7 +368,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
 
         match (addr, write) {
             (SYSREG_ICC_SGI1R_EL1, true) => {
-                debug!("arm_vcpu ICC_SGI1R_EL1 write: {:#x}", value);
+                debug!("arm_vcpu ICC_SGI1R_EL1 write: {value:#x}");
 
                 // TODO: support RangeSelector
 
@@ -395,8 +394,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
                 let target_list = value & 0xffff;
 
                 debug!(
-                    "arm_vcpu ICC_SGI1R_EL1 write: aff3:{:#x} aff2:{:#x} aff1:{:#x} intid:{:#x} target_list:{:#x}",
-                    aff3, aff2, aff1, intid, target_list
+                    "arm_vcpu ICC_SGI1R_EL1 write: aff3:{aff3:#x} aff2:{aff2:#x} aff1:{aff1:#x} intid:{intid:#x} target_list:{target_list:#x}"
                 );
 
                 Ok(Some(AxVCpuExitReason::SendIPI {
