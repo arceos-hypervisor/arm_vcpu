@@ -28,7 +28,7 @@ tock-registers = "0.9"
 
 axerrno = "0.1.0"
 percpu = {version = "0.2.0", features = ["arm-el2"]}
-axcpu = {path="../axcpu", features = ["arm-el2"]}
+axcpu = {path="../axcpu", version = "0.2", features = ["arm-el2"]}
 
 axaddrspace = "0.1.0"
 axdevice_base = "0.1.0"
