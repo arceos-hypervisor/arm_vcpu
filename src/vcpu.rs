@@ -255,6 +255,37 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
 
 /// Private functions related to vcpu runtime control flow.
 impl<H: AxVCpuHal> Aarch64VCpu<H> {
+    // /// Save host context and run guest.
+    // ///
+    // /// When a VM-Exit happens when guest's vCpu is running,
+    // /// the control flow will be redirected to this function through `return_run_guest`.
+    // #[unsafe(naked)]
+    // unsafe extern "C" fn run_guest(&mut self) -> usize {
+    //     // Fixes: https://github.com/arceos-hypervisor/arm_vcpu/issues/22
+    //     //
+    //     // The original issue seems to be caused by an unexpected compiler optimization that takes
+    //     // the dummy return value `0` of `run_guest` as the actual return value. By replacing the
+    //     // original `run_guest` with the current naked one, we eliminate the dummy code path of the
+    //     // original version, and ensure that the compiler does not perform any unexpected return
+    //     // value optimization.
+    //     core::arch::naked_asm!(
+    //         // Save host context.
+    //         save_regs_to_stack!(),
+    //         // Save current host stack top to `self.host_stack_top`.
+    //         //
+    //         // 'extern "C"' here specifies the aapcs64 calling convention, according to which
+    //         // the first and only parameter, the pointer of self, should be in x0:
+    //         "mov x9, sp",
+    //         "add x0, x0, {host_stack_top_offset}",
+    //         "str x9, [x0]",
+    //         // Go to `context_vm_entry`.
+    //         "b context_vm_entry",
+    //         // Panic if the control flow comes back here, which should never happen.
+    //         "b {run_guest_panic}",
+    //         host_stack_top_offset = const core::mem::size_of::<TrapFrame>(),
+    //         run_guest_panic = sym Self::run_guest_panic,
+    //     );
+    // }
     /// Save host context and run guest.
     ///
     /// When a VM-Exit happens when guest's vCpu is running,
@@ -279,14 +310,13 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             "add x0, x0, {host_stack_top_offset}",
             "str x9, [x0]",
             // Go to `context_vm_entry`.
-            "b context_vm_entry",
-            // Panic if the control flow comes back here, which should never happen.
+            "b {entry}",
             "b {run_guest_panic}",
             host_stack_top_offset = const core::mem::size_of::<TrapFrame>(),
+            entry = sym axcpu::el2::enter_guest,
             run_guest_panic = sym Self::run_guest_panic,
         );
     }
-
     /// This function is called when the control flow comes back to `run_guest`. To provide a error
     /// message for debugging purposes.
     ///
@@ -348,9 +378,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
 
         let result = match exit_reason {
             TrapKind::Synchronous => handle_exception_sync(&mut self.ctx),
-            TrapKind::Irq => Ok(AxVCpuExitReason::ExternalInterrupt {
-                vector: H::irq_fetch() as _,
-            }),
+            TrapKind::Irq => Ok(AxVCpuExitReason::ExternalInterrupt { vector: 0 }),
             _ => panic!("Unhandled exception {:?}", exit_reason),
         };
 

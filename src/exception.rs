@@ -28,11 +28,6 @@ pub enum TrapKind {
 }
 }
 
-/// Equals to [`TrapKind::Synchronous`], used in exception.S.
-const EXCEPTION_SYNC: usize = TrapKind::Synchronous as usize;
-/// Equals to [`TrapKind::Irq`], used in exception.S.
-const EXCEPTION_IRQ: usize = TrapKind::Irq as usize;
-
 #[repr(u8)]
 #[derive(Debug)]
 #[allow(unused)]
@@ -42,12 +37,6 @@ enum TrapSource {
     LowerAArch64 = 2,
     LowerAArch32 = 3,
 }
-
-core::arch::global_asm!(
-    include_str!("exception.S"),
-    exception_sync = const EXCEPTION_SYNC,
-    exception_irq = const EXCEPTION_IRQ,
-);
 
 /// Handles synchronous exceptions that occur during the execution of a guest VM.
 ///
@@ -276,33 +265,6 @@ fn handle_smc64_exception(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
     }
 }
 
-/// Handles IRQ exceptions that occur from the current exception level.
-/// Dispatches IRQs to the appropriate handler provided by the underlying host OS,
-/// which is registered at [`crate::pcpu::IRQ_HANDLER`] during `Aarch64PerCpu::new()`.
-#[unsafe(no_mangle)]
-fn current_el_irq_handler(_tf: &mut TrapFrame) {
-    unsafe { crate::pcpu::IRQ_HANDLER.current_ref_raw() }
-        .get()
-        .unwrap()()
-}
-
-/// Handles synchronous exceptions that occur from the current exception level.
-#[unsafe(no_mangle)]
-fn current_el_sync_handler(tf: &mut TrapFrame) {
-    let esr = ESR_EL2.extract();
-    let ec = ESR_EL2.read(ESR_EL2::EC);
-    let iss = ESR_EL2.read(ESR_EL2::ISS);
-
-    error!("ESR_EL2: {:#x}", esr.get());
-    error!("Exception Class: {ec:#x}");
-    error!("Instruction Specific Syndrome: {iss:#x}");
-
-    panic!(
-        "Unhandled synchronous exception from current EL: {:#x?}",
-        tf
-    );
-}
-
 /// A trampoline function for sp switching during handling VM exits,
 /// when **there is a active VCPU running**, which means that the host context is stored
 /// into host stack in `run_guest` function.
@@ -340,7 +302,7 @@ fn current_el_sync_handler(tf: &mut TrapFrame) {
 ///   invoked as part of the low-level hypervisor or VM exit handling routines.
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
-unsafe extern "C" fn vmexit_trampoline() -> ! {
+unsafe extern "C" fn handle_vmexit() -> ! {
     core::arch::naked_asm!(
         // Curretly `sp` points to the base address of `Aarch64VCpu.ctx`, which stores guest's `TrapFrame`.
         "add x9, sp, 34 * 8", // Skip the exception frame.
@@ -350,13 +312,4 @@ unsafe extern "C" fn vmexit_trampoline() -> ! {
         restore_regs_from_stack!(), // Restore host function context frame.
         "ret", // Control flow is handed back to Aarch64VCpu.run(), simulating the normal return of the `run_guest` function.
     )
-}
-
-/// Deal with invalid aarch64 exception.
-#[unsafe(no_mangle)]
-fn invalid_exception_el2(tf: &mut TrapFrame, kind: TrapKind, source: TrapSource) {
-    panic!(
-        "Invalid exception {:?} from {:?}:\n{:#x?}",
-        kind, source, tf
-    );
 }
