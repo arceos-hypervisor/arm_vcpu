@@ -286,6 +286,8 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             "mov x9, sp",
             "add x0, x0, {host_stack_top_offset}",
             "str x9, [x0]",
+            "mov sp, x0",
+            "sub sp, sp, {host_stack_top_offset}",
             // Go to `context_vm_entry`.
             "b {entry}",
             "b {run_guest_panic}",
