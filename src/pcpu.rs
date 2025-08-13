@@ -41,12 +41,12 @@ impl<H: AxVCpuHal> AxArchPerCpu for Aarch64PerCpu<H> {
         //
         // We leave it for the virtual GIC implementations to decide whether to enable it or not.
         //
-        // unsafe {
-        //     core::arch::asm! {
-        //         "msr ich_hcr_el2, {value:x}",
-        //         value = in(reg) 0,
-        //     }
-        // }
+        unsafe {
+            core::arch::asm! {
+                "msr ich_hcr_el2, {value:x}",
+                value = in(reg) 1,
+            }
+        }
 
         Ok(())
     }
