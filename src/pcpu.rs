@@ -27,15 +27,6 @@ impl<H: AxVCpuHal> AxArchPerCpu for Aarch64PerCpu<H> {
     }
 
     fn hardware_enable(&mut self) -> AxResult {
-        // First we save origin `exception_vector_base`.
-        // Safety:
-        // Todo: take care of `preemption`
-        // unsafe { ORI_EXCEPTION_VECTOR_BASE.write_current_raw(VBAR_EL2.get() as usize) }
-
-        // Set current `VBAR_EL2` to `exception_vector_base_vcpu`
-        // defined in this crate.
-        // VBAR_EL2.set(exception_vector_base_vcpu as usize as _);
-
         HCR_EL2.modify(
             HCR_EL2::VM::Enable
                 + HCR_EL2::RW::EL1IsAarch64
@@ -61,11 +52,6 @@ impl<H: AxVCpuHal> AxArchPerCpu for Aarch64PerCpu<H> {
     }
 
     fn hardware_disable(&mut self) -> AxResult {
-        // Reset `VBAR_EL2` into previous value.
-        // Safety:
-        // Todo: take care of `preemption`
-        // VBAR_EL2.set(unsafe { ORI_EXCEPTION_VECTOR_BASE.read_current_raw() } as _);
-
         HCR_EL2.set(HCR_EL2::VM::Disable.into());
         Ok(())
     }
