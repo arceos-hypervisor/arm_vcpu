@@ -15,7 +15,6 @@ use axaddrspace::{
 };
 use axerrno::{AxError, AxResult};
 use axvcpu::AxVCpuExitReason;
-use log::error;
 
 numeric_enum_macro::numeric_enum! {
 #[repr(u8)]
