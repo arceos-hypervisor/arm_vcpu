@@ -1,36 +1,30 @@
 [package]
-edition = "2024"
-name = "arm_vcpu"
-version = "0.1.0"
 authors = [
-    "KeYang Hu <keyang.hu@qq.com>",
-    "Mingxian Su <aarkegz@gmail.com>",
-    "ShiMei Tang <shimei820@gmail.com>",
-    "DeBin Luo <luodeb@outlook.com>",
-    "周睿 <zrufo747@outlook.com>"
+  "KeYang Hu <keyang.hu@qq.com>",
+  "Mingxian Su <aarkegz@gmail.com>",
+  "ShiMei Tang <shimei820@gmail.com>",
+  "DeBin Luo <luodeb@outlook.com>",
+  "周睿 <zrufo747@outlook.com>",
 ]
-description = "Aarch64 VCPU implementation for Arceos Hypervisor"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/arceos-hypervisor/arm_vcpu"
 categories = ["embedded", "no-std"]
+description = "Aarch64 VCPU implementation for Arceos Hypervisor"
+edition = "2024"
 keywords = ["hypervisor", "aarch64", "vcpu"]
-
-[features]
-4-level-ept = []
+license = "MIT OR Apache-2.0"
+name = "arm_vcpu"
+repository = "https://github.com/arceos-hypervisor/arm_vcpu"
+version = "0.1.0"
 
 [dependencies]
-log = "0.4"
-spin = "0.10"
-
 aarch64-cpu = "10.0"
+log = "0.4"
 numeric-enum-macro = "0.2"
-tock-registers = "0.9"
+spin = "0.10"
 
 axerrno = "0.1.0"
 percpu = {version = "0.2.0", features = ["arm-el2"]}
-axcpu = {path="../axcpu", version = "0.2", features = ["arm-el2"]}
 
-axaddrspace = "0.1.0"
-axdevice_base = "0.1.0"
-axvcpu = "0.1.0"
-axvisor_api = "0.1.0"
+axaddrspace = "0.1"
+axdevice_base = "0.1"
+axvcpu = "0.1"
+axvisor_api = "0.1"
