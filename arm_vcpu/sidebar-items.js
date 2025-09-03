@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["has_hardware_support"],"struct":["Aarch64PerCpu","Aarch64VCpu","Aarch64VCpuCreateConfig","Aarch64VCpuSetupConfig"],"type":["TrapFrame"]};
