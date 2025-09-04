@@ -192,9 +192,9 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             // read PARange (bits 3:0)
             let parange = (ID_AA64MMFR0_EL1.get() & 0xF) as u8;
             // ARM Definition: 0x5 indicates 48 bits PA, 0x4 indicates 44 bits PA, and so on.
-            if parange <= 0x5 {
+            if parange <= 0x4 {
                 panic!(
-                    "CPU only supports {}-bit PA (< 48), \
+                    "CPU only supports {}-bit PA (< 44), \
                  cannot enable 4-level EPT paging!",
                     match parange {
                         0x0 => 32,
