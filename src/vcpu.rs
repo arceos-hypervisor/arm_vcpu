@@ -229,7 +229,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_44) => 44,
             Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_48) => 48,
             Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_52) => 52,
-            _ => 32, 
+            _ => 32,
         };
 
         let mut val = match pa_bits {
