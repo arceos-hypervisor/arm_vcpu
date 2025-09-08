@@ -30,6 +30,6 @@ axerrno = "0.1.0"
 percpu = {version = "0.2.0", features = ["arm-el2"]}
 
 axaddrspace = "0.1"
-axdevice_base = "0.1.0"
-axvcpu = "0.1.0"
-axvisor_api = "0.1.0"
+axdevice_base = "0.1"
+axvcpu = "0.1"
+axvisor_api = "0.1"
