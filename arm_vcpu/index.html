@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="arm_vcpu"><title>arm_vcpu - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-0ce1a80b.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="arm_vcpu" data-themes="" data-resource-suffix="" data-rustdoc-version="1.89.0-nightly (60dabef95 2025-05-19)" data-channel="nightly" data-search-js="search-f7877310.js" data-settings-js="settings-5514c975.js" ><script src="../static.files/storage-4e99c027.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-7ef8a74a.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-32bb7600.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../arm_vcpu/index.html">arm_<wbr>vcpu</a><span class="version">0.1.1</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#arm_vcpu" title="arm_vcpu">arm_vcpu</a><ul><li><a href="#features" title="Features">Features</a></li><li><a href="#architecture-overview" title="Architecture Overview">Architecture Overview</a></li><li><a href="#usage" title="Usage">Usage</a></li><li><a href="#requirements" title="Requirements">Requirements</a></li><li><a href="#license" title="License">License</a></li></ul></li></ul><h3><a href="#structs">Crate Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#functions" title="Functions">Functions</a></li><li><a href="#types" title="Type Aliases">Type Aliases</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>arm_vcpu</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/arm_vcpu/lib.rs.html#1-31">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="arm_vcpu"><a class="doc-anchor" href="#arm_vcpu">§</a>arm_vcpu</h2>
+<p><a href="https://github.com/arceos-hypervisor/arm_vcpu/actions/workflows/ci.yml"><img src="https://github.com/arceos-hypervisor/arm_vcpu/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI" /></a>
+<a href="https://crates.io/crates/arm_vcpu"><img src="https://img.shields.io/crates/v/arm_vcpu" alt="Crates.io" /></a>
+[<img src="https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg" alt="License" />]</p>
+<p>AArch64 virtual CPU (vCPU) implementation for hypervisors. This crate provides the core vCPU structure and virtualization-related interface support specifically designed for the AArch64 architecture.</p>
+<h3 id="features"><a class="doc-anchor" href="#features">§</a>Features</h3>
+<ul>
+<li>🔧 <strong>Complete vCPU Implementation</strong>: Full virtual CPU structure for AArch64 guests</li>
+<li>🚀 <strong>Exception Handling</strong>: Comprehensive trap and exception handling for virtualized environments</li>
+<li>🎯 <strong>Hardware Virtualization</strong>: Support for ARMv8 virtualization extensions (EL2)</li>
+<li>🔒 <strong>Security</strong>: SMC (Secure Monitor Call) handling and secure virtualization</li>
+<li>📊 <strong>Per-CPU Support</strong>: Efficient per-CPU data structures and management</li>
+<li>🛠️ <strong>No-std Compatible</strong>: Works in bare-metal and embedded environments</li>
+</ul>
+<h3 id="architecture-overview"><a class="doc-anchor" href="#architecture-overview">§</a>Architecture Overview</h3>
+<p>This crate implements the following key components:</p>
+<ul>
+<li><strong><code>Aarch64VCpu</code></strong>: The main virtual CPU structure that manages guest execution state</li>
+<li><strong><code>TrapFrame</code></strong>: Context frame for handling traps and exceptions from guest VMs</li>
+<li><strong>Exception Handlers</strong>: Support for synchronous and asynchronous exception handling</li>
+<li><strong>System Register Emulation</strong>: Virtualized access to AArch64 system registers</li>
+<li><strong>SMC Interface</strong>: Secure Monitor Call handling for trusted execution</li>
+</ul>
+<h3 id="usage"><a class="doc-anchor" href="#usage">§</a>Usage</h3>
+<p>Add this to your <code>Cargo.toml</code>:</p>
+<div class="example-wrap"><pre class="language-toml"><code>[dependencies]
+arm_vcpu = &quot;0.1&quot;</code></pre></div><h4 id="basic-example"><a class="doc-anchor" href="#basic-example">§</a>Basic Example</h4>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>arm_vcpu::{Aarch64VCpu, Aarch64VCpuCreateConfig, has_hardware_support};
+
+<span class="comment">// Check if hardware virtualization is supported
+</span><span class="kw">if </span>has_hardware_support() {
+    <span class="comment">// Create vCPU configuration
+    </span><span class="kw">let </span>config = Aarch64VCpuCreateConfig::default();
+    
+    <span class="comment">// Create and configure the virtual CPU
+    </span><span class="kw">let </span>vcpu = Aarch64VCpu::new(config)<span class="question-mark">?</span>;
+    
+    <span class="comment">// Run the virtual CPU
+    </span>vcpu.run()<span class="question-mark">?</span>;
+}</code></pre></div>
+<h3 id="requirements"><a class="doc-anchor" href="#requirements">§</a>Requirements</h3>
+<ul>
+<li><strong>Architecture</strong>: AArch64 (ARMv8-A or later)</li>
+<li><strong>Privilege Level</strong>: EL2 (Hypervisor mode) required for full functionality</li>
+</ul>
+<h3 id="license"><a class="doc-anchor" href="#license">§</a>License</h3>
+<p>This project is dual-licensed under either:</p>
+<ul>
+<li>MIT License (<a href="LICENSE-MIT">LICENSE-MIT</a> or <a href="http://opensource.org/licenses/MIT">http://opensource.org/licenses/MIT</a>)</li>
+<li>Apache License, Version 2.0 (<a href="LICENSE-APACHE">LICENSE-APACHE</a> or <a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>)</li>
+</ul>
+<p>at your option.</p>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.Aarch64PerCpu.html" title="struct arm_vcpu::Aarch64PerCpu">Aarch64<wbr>PerCpu</a></dt><dd>Per-CPU data. A pointer to this struct is loaded into TP when a CPU starts. This structure</dd><dt><a class="struct" href="struct.Aarch64VCpu.html" title="struct arm_vcpu::Aarch64VCpu">Aarch64V<wbr>Cpu</a></dt><dd>A virtual CPU within a guest</dd><dt><a class="struct" href="struct.Aarch64VCpuCreateConfig.html" title="struct arm_vcpu::Aarch64VCpuCreateConfig">Aarch64V<wbr>CpuCreate<wbr>Config</a></dt><dd>Configuration for creating a new <code>Aarch64VCpu</code></dd><dt><a class="struct" href="struct.Aarch64VCpuSetupConfig.html" title="struct arm_vcpu::Aarch64VCpuSetupConfig">Aarch64V<wbr>CpuSetup<wbr>Config</a></dt><dd>Configuration for setting up a new <code>Aarch64VCpu</code></dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.has_hardware_support.html" title="fn arm_vcpu::has_hardware_support">has_<wbr>hardware_<wbr>support</a></dt><dd>Return if current platform support virtualization extension.</dd></dl><h2 id="types" class="section-header">Type Aliases<a href="#types" class="anchor">§</a></h2><dl class="item-table"><dt><a class="type" href="type.TrapFrame.html" title="type arm_vcpu::TrapFrame">Trap<wbr>Frame</a></dt><dd>context frame for aarch64</dd></dl></section></div></main></body></html>
