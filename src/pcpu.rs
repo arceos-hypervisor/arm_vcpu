@@ -23,7 +23,7 @@ static ORI_EXCEPTION_VECTOR_BASE: usize = 0;
 #[percpu::def_percpu]
 pub static IRQ_HANDLER: OnceCell<&(dyn Fn() + Send + Sync)> = OnceCell::new();
 
-unsafe extern "C" {
+unsafe extern {
     fn exception_vector_base_vcpu();
 }
 
@@ -82,5 +82,9 @@ impl<H: AxVCpuHal> AxArchPerCpu for Aarch64PerCpu<H> {
 
         HCR_EL2.set(HCR_EL2::VM::Disable.into());
         Ok(())
+    }
+
+    fn max_guest_page_table_levels(&self) -> usize {
+        crate::vcpu::max_gpt_level(crate::vcpu::pa_bits())
     }
 }

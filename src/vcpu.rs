@@ -215,7 +215,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
     /// When a VM-Exit happens when guest's vCpu is running,
     /// the control flow will be redirected to this function through `return_run_guest`.
     #[unsafe(naked)]
-    unsafe extern "C" fn run_guest(&mut self) -> usize {
+    unsafe extern fn run_guest(&mut self) -> usize {
         // Fixes: https://github.com/arceos-hypervisor/arm_vcpu/issues/22
         //
         // The original issue seems to be caused by an unexpected compiler optimization that takes
@@ -397,8 +397,8 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
     }
 }
 
-fn probe_vtcr_support() -> u64 {
-    let pa_bits = match ID_AA64MMFR0_EL1.read_as_enum(ID_AA64MMFR0_EL1::PARange) {
+pub(crate) fn pa_bits() -> usize {
+    match ID_AA64MMFR0_EL1.read_as_enum(ID_AA64MMFR0_EL1::PARange) {
         Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_32) => 32,
         Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_36) => 36,
         Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_40) => 40,
@@ -407,10 +407,31 @@ fn probe_vtcr_support() -> u64 {
         Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_48) => 48,
         Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_52) => 52,
         _ => 32,
-    };
+    }
+}
 
-    let mut val = match pa_bits {
-        44.. => VTCR_EL2::SL0::Granule4KBLevel0 + VTCR_EL2::T0SZ.val(64 - 48),
+#[allow(dead_code)]
+pub(crate) fn current_gpt_level() -> usize {
+    let t0sz = VTCR_EL2.read(VTCR_EL2::T0SZ) as usize;
+    match t0sz {
+        16..=25 => 4,
+        26..=35 => 3,
+        _ => 2,
+    }
+}
+
+pub(crate) fn max_gpt_level(pa_bits: usize) -> usize {
+    match pa_bits {
+        44.. => 4,
+        _ => 3,
+    }
+}
+
+fn probe_vtcr_support() -> u64 {
+    let pa_bits = pa_bits();
+
+    let mut val = match max_gpt_level(pa_bits) {
+        4 => VTCR_EL2::SL0::Granule4KBLevel0 + VTCR_EL2::T0SZ.val(64 - 48),
         _ => VTCR_EL2::SL0::Granule4KBLevel1 + VTCR_EL2::T0SZ.val(64 - 39),
     };
 
