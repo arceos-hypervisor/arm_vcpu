@@ -25,8 +25,8 @@ numeric-enum-macro = "0.2"
 axerrno = "0.1.0"
 percpu = {version = "0.2.0", features = ["arm-el2"]}
 
-axaddrspace = "0.1"
+axaddrspace = "0.2"
 axdevice_base = "0.1.0"
-axvcpu = {git="https://github.com/arceos-hypervisor/axvcpu.git", branch="next"}
+axvcpu = {git = "https://github.com/arceos-hypervisor/axvcpu.git", branch = "next"}
 # axvcpu = "0.1.0"
 axvisor_api = "0.1.0"
