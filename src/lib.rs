@@ -19,6 +19,9 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 pub use self::pcpu::Aarch64PerCpu;
 pub use self::vcpu::{Aarch64VCpu, Aarch64VCpuCreateConfig, Aarch64VCpuSetupConfig};
+pub use axvm_types::addr::*;
+pub use axvm_types::device::*;
+pub use exit::*;
 
 /// context frame for aarch64
 pub type TrapFrame = context_frame::Aarch64ContextFrame;
