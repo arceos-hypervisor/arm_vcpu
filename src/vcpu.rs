@@ -1,14 +1,17 @@
 use core::marker::PhantomData;
 
 use aarch64_cpu::registers::*;
-use axaddrspace::{GuestPhysAddr, HostPhysAddr, device::SysRegAddr};
 use axerrno::AxResult;
-use axvcpu::{AxArchVCpu, AxVCpuExitReason, AxVCpuHal};
+use axvm_types::{
+    addr::{GuestPhysAddr, HostPhysAddr},
+    device::SysRegAddr,
+};
 
-use crate::TrapFrame;
 use crate::context_frame::GuestSystemRegisters;
 use crate::exception::{TrapKind, handle_exception_sync};
 use crate::exception_utils::exception_class_value;
+use crate::exit::AxVCpuExitReason;
+use crate::{TrapFrame, inject_interrupt};
 
 #[percpu::def_percpu]
 static HOST_SP_EL0: u64 = 0;
@@ -37,7 +40,7 @@ pub struct VmCpuRegisters {
 /// A virtual CPU within a guest
 #[repr(C)]
 #[derive(Debug)]
-pub struct Aarch64VCpu<H: AxVCpuHal> {
+pub struct Aarch64VCpu {
     // DO NOT modify `guest_regs` and `host_stack_top` and their order unless you do know what you are doing!
     // DO NOT add anything before or between them unless you do know what you are doing!
     ctx: TrapFrame,
@@ -45,7 +48,6 @@ pub struct Aarch64VCpu<H: AxVCpuHal> {
     guest_system_regs: GuestSystemRegisters,
     /// The MPIDR_EL1 value for the vCPU.
     mpidr: u64,
-    _phantom: PhantomData<H>,
 }
 
 /// Configuration for creating a new `Aarch64VCpu`
@@ -69,12 +71,8 @@ pub struct Aarch64VCpuSetupConfig {
     pub passthrough_timer: bool,
 }
 
-impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
-    type CreateConfig = Aarch64VCpuCreateConfig;
-
-    type SetupConfig = Aarch64VCpuSetupConfig;
-
-    fn new(_vm_id: usize, _vcpu_id: usize, config: Self::CreateConfig) -> AxResult<Self> {
+impl Aarch64VCpu {
+    fn new(_vm_id: usize, _vcpu_id: usize, config: Aarch64VCpuCreateConfig) -> AxResult<Self> {
         let mut ctx = TrapFrame::default();
         ctx.set_argument(config.dtb_addr);
 
@@ -83,11 +81,10 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
             host_stack_top: 0,
             guest_system_regs: GuestSystemRegisters::default(),
             mpidr: config.mpidr_el1,
-            _phantom: PhantomData,
         })
     }
 
-    fn setup(&mut self, config: Self::SetupConfig) -> AxResult {
+    fn setup(&mut self, config: Aarch64VCpuSetupConfig) -> AxResult {
         self.init_hv(config);
         Ok(())
     }
@@ -131,7 +128,8 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
     }
 
     fn inject_interrupt(&mut self, vector: usize) -> AxResult {
-        axvisor_api::arch::hardware_inject_virtual_interrupt(vector as u8);
+        inject_interrupt(vector);
+        // axvisor_api::arch::hardware_inject_virtual_interrupt(vector as u8);
         Ok(())
     }
 
@@ -142,7 +140,7 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
 }
 
 // Private function
-impl<H: AxVCpuHal> Aarch64VCpu<H> {
+impl Aarch64VCpu {
     fn init_hv(&mut self, config: Aarch64VCpuSetupConfig) {
         self.ctx.spsr = (SPSR_EL1::M::EL1h
             + SPSR_EL1::I::Masked
@@ -209,13 +207,13 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
 }
 
 /// Private functions related to vcpu runtime control flow.
-impl<H: AxVCpuHal> Aarch64VCpu<H> {
+impl Aarch64VCpu {
     /// Save host context and run guest.
     ///
     /// When a VM-Exit happens when guest's vCpu is running,
     /// the control flow will be redirected to this function through `return_run_guest`.
     #[unsafe(naked)]
-    unsafe extern fn run_guest(&mut self) -> usize {
+    unsafe extern "C" fn run_guest(&mut self) -> usize {
         // Fixes: https://github.com/arceos-hypervisor/arm_vcpu/issues/22
         //
         // The original issue seems to be caused by an unexpected compiler optimization that takes
@@ -303,9 +301,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
 
         let result = match exit_reason {
             TrapKind::Synchronous => handle_exception_sync(&mut self.ctx),
-            TrapKind::Irq => Ok(AxVCpuExitReason::ExternalInterrupt {
-                vector: H::irq_fetch() as _,
-            }),
+            TrapKind::Irq => Ok(AxVCpuExitReason::ExternalInterrupt),
             _ => panic!("Unhandled exception {:?}", exit_reason),
         };
 

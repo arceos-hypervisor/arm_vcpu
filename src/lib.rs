@@ -10,9 +10,12 @@ mod context_frame;
 #[macro_use]
 mod exception_utils;
 mod exception;
+mod exit;
 mod pcpu;
 mod smc;
 mod vcpu;
+
+use core::sync::atomic::{AtomicBool, Ordering};
 
 pub use self::pcpu::Aarch64PerCpu;
 pub use self::vcpu::{Aarch64VCpu, Aarch64VCpuCreateConfig, Aarch64VCpuSetupConfig};
@@ -32,5 +35,45 @@ pub fn has_hardware_support() -> bool {
 }
 
 pub trait CpuHal {
-    fn inject_interrupt(irq: usize);
+    fn irq_hanlder(&self);
+    fn inject_interrupt(&self, irq: usize);
+}
+
+struct NopHal;
+
+impl CpuHal for NopHal {
+    fn irq_hanlder(&self) {
+        unimplemented!()
+    }
+    fn inject_interrupt(&self, _irq: usize) {
+        unimplemented!()
+    }
+}
+
+static mut HAL: &dyn CpuHal = &NopHal;
+static INIT: AtomicBool = AtomicBool::new(false);
+
+fn hal() -> &'static dyn CpuHal {
+    unsafe { HAL }
+}
+
+fn handle_irq() {
+    hal().irq_hanlder();
+}
+
+fn inject_interrupt(irq: usize) {
+    hal().inject_interrupt(irq);
+}
+
+pub fn init_hal(hal: &'static dyn CpuHal) {
+    if INIT
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        unsafe {
+            HAL = hal;
+        }
+    } else {
+        panic!("arm_vcpu hal has been initialized");
+    }
 }

@@ -1,4 +1,4 @@
-use crate::TrapFrame;
+use crate::{TrapFrame, handle_irq};
 use crate::exception_utils::{
     exception_class, exception_class_value, exception_data_abort_access_is_write,
     exception_data_abort_access_reg, exception_data_abort_access_reg_width,
@@ -9,13 +9,12 @@ use crate::exception_utils::{
 };
 
 use aarch64_cpu::registers::{ESR_EL2, HCR_EL2, Readable, SCTLR_EL1, VTCR_EL2, VTTBR_EL2};
-use axaddrspace::{
-    GuestPhysAddr,
+use axvm_types::{
+    addr::GuestPhysAddr,
     device::{AccessWidth, SysRegAddr},
 };
 use axerrno::{AxError, AxResult};
-use axvcpu::AxVCpuExitReason;
-use log::error;
+use crate::exit::AxVCpuExitReason;
 
 numeric_enum_macro::numeric_enum! {
 #[repr(u8)]
@@ -281,9 +280,7 @@ fn handle_smc64_exception(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
 /// which is registered at [`crate::pcpu::IRQ_HANDLER`] during `Aarch64PerCpu::new()`.
 #[unsafe(no_mangle)]
 fn current_el_irq_handler(_tf: &mut TrapFrame) {
-    unsafe { crate::pcpu::IRQ_HANDLER.current_ref_raw() }
-        .get()
-        .unwrap()()
+    handle_irq();
 }
 
 /// Handles synchronous exceptions that occur from the current exception level.
