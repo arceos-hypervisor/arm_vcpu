@@ -30,3 +30,7 @@ pub fn has_hardware_support() -> bool {
     // Current just return true by default.
     true
 }
+
+pub trait CpuHal {
+    fn inject_interrupt(irq: usize);
+}
