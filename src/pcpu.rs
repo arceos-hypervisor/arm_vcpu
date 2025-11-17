@@ -9,8 +9,6 @@ use crate::CpuHal;
 #[repr(C)]
 #[repr(align(4096))]
 pub struct Aarch64PerCpu {
-    /// per cpu id
-    pub cpu_id: usize,
     ori_vbar: u64,
 }
 
@@ -19,18 +17,17 @@ unsafe extern "C" {
 }
 
 impl Aarch64PerCpu {
-    fn new(cpu_id: usize) -> AxResult<Self> {
-        Ok(Self {
-            cpu_id,
+    pub fn new() -> Self {
+        Self {
             ori_vbar: VBAR_EL2.get(),
-        })
+        }
     }
 
-    fn is_enabled(&self) -> bool {
+    pub fn is_enabled(&self) -> bool {
         HCR_EL2.is_set(HCR_EL2::VM)
     }
 
-    fn hardware_enable(&mut self) -> AxResult {
+    pub fn hardware_enable(&mut self) {
         // Set current `VBAR_EL2` to `exception_vector_base_vcpu`
         // defined in this crate.
         VBAR_EL2.set(exception_vector_base_vcpu as usize as _);
@@ -51,11 +48,9 @@ impl Aarch64PerCpu {
         //         value = in(reg) 0,
         //     }
         // }
-
-        Ok(())
     }
 
-    fn hardware_disable(&mut self) -> AxResult {
+    pub fn hardware_disable(&mut self) -> AxResult {
         // Reset `VBAR_EL2` into previous value.
         // Safety:
         // Todo: take care of `preemption`
@@ -65,7 +60,7 @@ impl Aarch64PerCpu {
         Ok(())
     }
 
-    fn max_guest_page_table_levels(&self) -> usize {
+    pub fn max_guest_page_table_levels(&self) -> usize {
         crate::vcpu::max_gpt_level(crate::vcpu::pa_bits())
     }
 }
