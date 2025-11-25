@@ -72,7 +72,7 @@ pub struct Aarch64VCpuSetupConfig {
 }
 
 impl Aarch64VCpu {
-    fn new(_vm_id: usize, _vcpu_id: usize, config: Aarch64VCpuCreateConfig) -> AxResult<Self> {
+    pub fn new(config: Aarch64VCpuCreateConfig) -> AxResult<Self> {
         let mut ctx = TrapFrame::default();
         ctx.set_argument(config.dtb_addr);
 
@@ -84,24 +84,24 @@ impl Aarch64VCpu {
         })
     }
 
-    fn setup(&mut self, config: Aarch64VCpuSetupConfig) -> AxResult {
+    pub fn setup(&mut self, config: Aarch64VCpuSetupConfig) -> AxResult {
         self.init_hv(config);
         Ok(())
     }
 
-    fn set_entry(&mut self, entry: GuestPhysAddr) -> AxResult {
+    pub fn set_entry(&mut self, entry: GuestPhysAddr) -> AxResult {
         debug!("set vcpu entry:{entry:?}");
         self.set_elr(entry.as_usize());
         Ok(())
     }
 
-    fn set_ept_root(&mut self, ept_root: HostPhysAddr) -> AxResult {
+    pub fn set_ept_root(&mut self, ept_root: HostPhysAddr) -> AxResult {
         debug!("set vcpu ept root:{ept_root:#x}");
         self.guest_system_regs.vttbr_el2 = ept_root.as_usize() as u64;
         Ok(())
     }
 
-    fn run(&mut self) -> AxResult<AxVCpuExitReason> {
+    pub fn run(&mut self) -> AxResult<AxVCpuExitReason> {
         // Run guest.
         let exit_reson = unsafe {
             // Save host SP_EL0 to the ctx becase it's used as current task ptr.
@@ -115,25 +115,25 @@ impl Aarch64VCpu {
         self.vmexit_handler(trap_kind)
     }
 
-    fn bind(&mut self) -> AxResult {
+    pub fn bind(&mut self) -> AxResult {
         Ok(())
     }
 
-    fn unbind(&mut self) -> AxResult {
+    pub fn unbind(&mut self) -> AxResult {
         Ok(())
     }
 
-    fn set_gpr(&mut self, idx: usize, val: usize) {
+    pub fn set_gpr(&mut self, idx: usize, val: usize) {
         self.ctx.set_gpr(idx, val);
     }
 
-    fn inject_interrupt(&mut self, vector: usize) -> AxResult {
+    pub fn inject_interrupt(&mut self, vector: usize) -> AxResult {
         inject_interrupt(vector);
         // axvisor_api::arch::hardware_inject_virtual_interrupt(vector as u8);
         Ok(())
     }
 
-    fn set_return_value(&mut self, val: usize) {
+    pub fn set_return_value(&mut self, val: usize) {
         // Return value is stored in x0.
         self.ctx.set_argument(val);
     }
