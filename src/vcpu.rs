@@ -89,6 +89,12 @@ impl Aarch64VCpu {
         Ok(())
     }
 
+    pub fn set_dtb_addr(&mut self, dtb_addr: GuestPhysAddr) -> AxResult {
+        debug!("set vcpu dtb addr:{dtb_addr:?}");
+        self.ctx.set_argument(dtb_addr.as_usize());
+        Ok(())
+    }
+
     pub fn set_entry(&mut self, entry: GuestPhysAddr) -> AxResult {
         debug!("set vcpu entry:{entry:?}");
         self.set_elr(entry.as_usize());
