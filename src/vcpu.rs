@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 use aarch64_cpu::registers::*;
 use axerrno::AxResult;
 use axvm_types::{

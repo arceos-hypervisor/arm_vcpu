@@ -1,7 +1,6 @@
 use axvm_types::{
     addr::GuestPhysAddr,
     device::{AccessWidth, SysRegAddr},
-    mem::MappingFlags,
 };
 
 /// Reasons for VM-Exits returned by [AxArchVCpu::run].

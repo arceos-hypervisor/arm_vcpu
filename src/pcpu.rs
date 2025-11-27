@@ -3,8 +3,6 @@ use core::cell::OnceCell;
 use aarch64_cpu::registers::*;
 use axerrno::AxResult;
 
-use crate::CpuHal;
-
 /// Per-CPU data. A pointer to this struct is loaded into TP when a CPU starts. This structure
 #[repr(C)]
 #[repr(align(4096))]
