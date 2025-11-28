@@ -1,6 +1,6 @@
 use aarch64_cpu::registers::*;
-use axvm_types::addr::GuestPhysAddr;
 use axerrno::{AxResult, ax_err};
+use axvm_types::addr::GuestPhysAddr;
 
 /// Retrieves the Exception Syndrome Register (ESR) value from EL2.
 ///
