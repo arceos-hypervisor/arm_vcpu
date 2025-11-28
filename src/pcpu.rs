@@ -1,5 +1,3 @@
-use core::cell::OnceCell;
-
 use aarch64_cpu::registers::*;
 use axerrno::AxResult;
 
