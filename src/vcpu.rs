@@ -119,35 +119,18 @@ impl Aarch64VCpu {
         self.vmexit_handler(trap_kind)
     }
 
-    pub fn bind(&mut self) -> AxResult {
-        Ok(())
-    }
-
-    pub fn unbind(&mut self) -> AxResult {
-        Ok(())
-    }
-
     pub fn set_gpr(&mut self, idx: usize, val: usize) {
         self.ctx.set_gpr(idx, val);
     }
 
     pub fn inject_interrupt(&mut self, vector: usize) -> AxResult {
         inject_interrupt(vector);
-        // axvisor_api::arch::hardware_inject_virtual_interrupt(vector as u8);
         Ok(())
     }
 
     pub fn set_return_value(&mut self, val: usize) {
         // Return value is stored in x0.
         self.ctx.set_argument(val);
-    }
-
-    pub fn ctx(&self) -> &TrapFrame {
-        &self.ctx
-    }
-
-    pub fn ctx_mut(&mut self) -> &mut TrapFrame {
-        &mut self.ctx
     }
 }
 
