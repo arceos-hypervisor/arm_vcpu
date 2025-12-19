@@ -59,4 +59,9 @@ impl Aarch64PerCpu {
     pub fn max_guest_page_table_levels(&self) -> usize {
         crate::vcpu::max_gpt_level(crate::vcpu::pa_bits())
     }
+
+    pub fn pa_range(&self) -> core::ops::Range<usize> {
+        let pa_bits = crate::vcpu::pa_bits();
+        0..(1 << pa_bits)
+    }
 }
