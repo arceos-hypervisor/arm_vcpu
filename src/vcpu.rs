@@ -141,6 +141,14 @@ impl Aarch64VCpu {
         // Return value is stored in x0.
         self.ctx.set_argument(val);
     }
+
+    pub fn ctx(&self) -> &TrapFrame {
+        &self.ctx
+    }
+
+    pub fn ctx_mut(&mut self) -> &mut TrapFrame {
+        &mut self.ctx
+    }
 }
 
 // Private function
