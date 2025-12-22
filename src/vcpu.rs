@@ -119,8 +119,7 @@ impl Aarch64VCpu {
         } + (VTCR_EL2::TG0::Granule4KB
             + VTCR_EL2::SH0::Inner
             + VTCR_EL2::ORGN0::NormalWBRAWA
-            + VTCR_EL2::IRGN0::NormalWBRAWA)
-            .value;
+            + VTCR_EL2::IRGN0::NormalWBRAWA);
         self.guest_system_regs.vtcr_el2 = val.value;
         VTCR_EL2.set(self.guest_system_regs.vtcr_el2);
 
