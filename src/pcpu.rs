@@ -60,6 +60,10 @@ impl Aarch64PerCpu {
         crate::vcpu::max_gpt_level(crate::vcpu::pa_bits())
     }
 
+    pub fn pa_bits(&self) -> usize {
+        crate::vcpu::pa_bits()
+    }
+
     pub fn pa_range(&self) -> core::ops::Range<usize> {
         let pa_bits = crate::vcpu::pa_bits();
         0..(1 << pa_bits)

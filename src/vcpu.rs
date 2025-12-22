@@ -49,6 +49,7 @@ pub struct Aarch64VCpu {
     /// The MPIDR_EL1 value for the vCPU.
     mpidr: u64,
     pub pt_level: usize,
+    pub pa_bits: usize,
 }
 
 /// Configuration for creating a new `Aarch64VCpu`
@@ -61,7 +62,6 @@ pub struct Aarch64VCpuCreateConfig {
     pub mpidr_el1: u64,
     /// The address of the device tree blob.
     pub dtb_addr: usize,
-    pub pt_level: usize,
 }
 
 /// Configuration for setting up a new `Aarch64VCpu`
@@ -78,12 +78,16 @@ impl Aarch64VCpu {
         let mut ctx = TrapFrame::default();
         ctx.set_argument(config.dtb_addr);
 
+        let pa_bits = pa_bits();
+        let pt_level = max_gpt_level(pa_bits);
+
         Ok(Self {
             ctx,
             host_stack_top: 0,
             guest_system_regs: GuestSystemRegisters::default(),
             mpidr: config.mpidr_el1,
-            pt_level: config.pt_level,
+            pt_level,
+            pa_bits,
         })
     }
 
@@ -113,18 +117,38 @@ impl Aarch64VCpu {
     pub fn setup_current_cpu(&mut self, vmid: usize) -> AxResult {
         // Set VMID then invalidate stage-2 TLB for this VMID to avoid stale translations.
         let vmid_mask: u64 = 0xffff << 48;
-        let val = match self.pt_level {
+        let mut val = match self.pt_level {
             4 => VTCR_EL2::SL0::Granule4KBLevel0 + VTCR_EL2::T0SZ.val(64 - 48),
             _ => VTCR_EL2::SL0::Granule4KBLevel1 + VTCR_EL2::T0SZ.val(64 - 39),
-        } + (VTCR_EL2::TG0::Granule4KB
+        };
+
+        val = val
+            + match self.pa_bits {
+                52..=64 => VTCR_EL2::PS::PA_52B_4PB,
+                48..=51 => VTCR_EL2::PS::PA_48B_256TB,
+                44..=47 => VTCR_EL2::PS::PA_44B_16TB,
+                42..=43 => VTCR_EL2::PS::PA_42B_4TB,
+                40..=41 => VTCR_EL2::PS::PA_40B_1TB,
+                36..=39 => VTCR_EL2::PS::PA_36B_64GB,
+                _ => VTCR_EL2::PS::PA_32B_4GB,
+            };
+
+        val = val
+            + VTCR_EL2::TG0::Granule4KB
             + VTCR_EL2::SH0::Inner
             + VTCR_EL2::ORGN0::NormalWBRAWA
-            + VTCR_EL2::IRGN0::NormalWBRAWA);
+            + VTCR_EL2::IRGN0::NormalWBRAWA;
+
         self.guest_system_regs.vtcr_el2 = val.value;
         VTCR_EL2.set(self.guest_system_regs.vtcr_el2);
+        debug!(
+            "vCPU {:#x} set pt level: {}, pt bits: {}",
+            self.mpidr, self.pt_level, self.pa_bits
+        );
 
         let mut vttbr = self.guest_system_regs.vttbr_el2;
         vttbr = (vttbr & !vmid_mask) | ((vmid as u64 & 0xffff) << 48);
+        self.guest_system_regs.vttbr_el2 = vttbr;
         VTTBR_EL2.set(vttbr);
 
         unsafe {
