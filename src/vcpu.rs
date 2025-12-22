@@ -1,3 +1,5 @@
+use core::fmt::Arguments;
+
 use aarch64_cpu::registers::*;
 use axerrno::AxResult;
 use axvm_types::{
@@ -88,20 +90,40 @@ impl Aarch64VCpu {
     }
 
     pub fn set_dtb_addr(&mut self, dtb_addr: GuestPhysAddr) -> AxResult {
-        debug!("set vcpu dtb addr:{dtb_addr:?}");
+        debug!("vCPU{} set vcpu dtb addr:{dtb_addr:?}", self.mpidr);
         self.ctx.set_argument(dtb_addr.as_usize());
         Ok(())
     }
 
     pub fn set_entry(&mut self, entry: GuestPhysAddr) -> AxResult {
-        debug!("set vcpu entry:{entry:?}");
+        debug!("vCPU{} set vcpu entry:{entry:?}", self.mpidr);
         self.set_elr(entry.as_usize());
         Ok(())
     }
 
     pub fn set_ept_root(&mut self, ept_root: HostPhysAddr) -> AxResult {
-        debug!("set vcpu ept root:{ept_root:#x}");
+        debug!("vCPU{} set vcpu ept root:{ept_root:#x}", self.mpidr);
         self.guest_system_regs.vttbr_el2 = ept_root.as_usize() as u64;
+        Ok(())
+    }
+
+    pub fn setup_current_cpu(&mut self, vmid: usize) -> AxResult {
+        // Set VMID then invalidate stage-2 TLB for this VMID to avoid stale translations.
+        let vmid_mask: u64 = 0xffff << 48;
+        let mut vttbr = self.guest_system_regs.vttbr_el2;
+        vttbr = (vttbr & !vmid_mask) | ((vmid as u64 & 0xffff) << 48);
+        VTTBR_EL2.set(vttbr);
+
+        unsafe {
+            core::arch::asm!(
+                "dsb ishst",         // ensure VTTBR write visible before TLB invalidation
+                "tlbi vmalls12e1is", // invalidate stage-2 by VMID (inner-shareable)
+                "dsb ish",           // ensure completion of invalidation
+                "isb",               // sync context
+                options(nostack, preserves_flags)
+            );
+        }
+
         Ok(())
     }
 
