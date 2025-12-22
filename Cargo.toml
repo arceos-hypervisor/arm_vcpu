@@ -16,16 +16,11 @@ repository = "https://github.com/arceos-hypervisor/arm_vcpu"
 version = "0.1.1"
 
 [dependencies]
+aarch64-cpu = "11.0"
 log = "0.4"
+numeric-enum-macro = "0.2"
 spin = "0.10"
 
-aarch64-cpu = "11.0"
-numeric-enum-macro = "0.2"
-axvm-types.workspace = true
-
 axerrno = "0.1.0"
+axvm-types.workspace = true
 percpu = {version = "0.2.0", features = ["arm-el2"]}
-
-# axaddrspace = "0.2"
-# axvcpu = "0.1.0"
-# axvisor_api = "0.1.0"
