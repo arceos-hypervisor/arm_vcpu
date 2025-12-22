@@ -48,6 +48,7 @@ pub struct Aarch64VCpu {
     guest_system_regs: GuestSystemRegisters,
     /// The MPIDR_EL1 value for the vCPU.
     mpidr: u64,
+    pub pt_level: usize,
 }
 
 /// Configuration for creating a new `Aarch64VCpu`
@@ -60,6 +61,7 @@ pub struct Aarch64VCpuCreateConfig {
     pub mpidr_el1: u64,
     /// The address of the device tree blob.
     pub dtb_addr: usize,
+    pub pt_level: usize,
 }
 
 /// Configuration for setting up a new `Aarch64VCpu`
@@ -81,6 +83,7 @@ impl Aarch64VCpu {
             host_stack_top: 0,
             guest_system_regs: GuestSystemRegisters::default(),
             mpidr: config.mpidr_el1,
+            pt_level: config.pt_level,
         })
     }
 
@@ -110,6 +113,17 @@ impl Aarch64VCpu {
     pub fn setup_current_cpu(&mut self, vmid: usize) -> AxResult {
         // Set VMID then invalidate stage-2 TLB for this VMID to avoid stale translations.
         let vmid_mask: u64 = 0xffff << 48;
+        let val = match self.pt_level {
+            4 => VTCR_EL2::SL0::Granule4KBLevel0 + VTCR_EL2::T0SZ.val(64 - 48),
+            _ => VTCR_EL2::SL0::Granule4KBLevel1 + VTCR_EL2::T0SZ.val(64 - 39),
+        } + (VTCR_EL2::TG0::Granule4KB
+            + VTCR_EL2::SH0::Inner
+            + VTCR_EL2::ORGN0::NormalWBRAWA
+            + VTCR_EL2::IRGN0::NormalWBRAWA)
+            .value;
+        self.guest_system_regs.vtcr_el2 = val.value;
+        VTCR_EL2.set(self.guest_system_regs.vtcr_el2);
+
         let mut vttbr = self.guest_system_regs.vttbr_el2;
         vttbr = (vttbr & !vmid_mask) | ((vmid as u64 & 0xffff) << 48);
         VTTBR_EL2.set(vttbr);
@@ -182,12 +196,12 @@ impl Aarch64VCpu {
         self.guest_system_regs.sctlr_el1 = 0x30C50830;
         self.guest_system_regs.pmcr_el0 = 0;
 
-        self.guest_system_regs.vtcr_el2 = probe_vtcr_support()
-            + (VTCR_EL2::TG0::Granule4KB
-                + VTCR_EL2::SH0::Inner
-                + VTCR_EL2::ORGN0::NormalWBRAWA
-                + VTCR_EL2::IRGN0::NormalWBRAWA)
-                .value;
+        // self.guest_system_regs.vtcr_el2 = probe_vtcr_support()
+        //     + (VTCR_EL2::TG0::Granule4KB
+        //         + VTCR_EL2::SH0::Inner
+        //         + VTCR_EL2::ORGN0::NormalWBRAWA
+        //         + VTCR_EL2::IRGN0::NormalWBRAWA)
+        //         .value;
 
         let mut hcr_el2 =
             HCR_EL2::VM::Enable + HCR_EL2::TSC::EnableTrapEl1SmcToEl2 + HCR_EL2::RW::EL1IsAarch64;
