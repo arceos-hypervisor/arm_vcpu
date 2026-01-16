@@ -340,7 +340,7 @@ fn current_el_sync_handler(tf: &mut TrapFrame) {
 ///   invoked as part of the low-level hypervisor or VM exit handling routines.
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
-unsafe extern fn vmexit_trampoline() -> ! {
+unsafe extern "C" fn vmexit_trampoline() -> ! {
     core::arch::naked_asm!(
         // Curretly `sp` points to the base address of `Aarch64VCpu.ctx`, which stores guest's `TrapFrame`.
         "add x9, sp, 34 * 8", // Skip the exception frame.
