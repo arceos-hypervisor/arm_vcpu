@@ -1,43 +1,29 @@
-use core::{cell::OnceCell, marker::PhantomData, mem};
+use core::mem;
 
 use aarch64_cpu::registers::*;
 use axerrno::AxResult;
-use axvcpu::{AxArchPerCpu, AxVCpuHal};
+use axvcpu::AxArchPerCpu;
 
 /// Per-CPU data. A pointer to this struct is loaded into TP when a CPU starts. This structure
 #[repr(C)]
 #[repr(align(4096))]
-pub struct Aarch64PerCpu<H: AxVCpuHal> {
+pub struct Aarch64PerCpu {
     /// per cpu id
     pub cpu_id: usize,
     /// The original value of `VBAR_EL2` (exception vector base) before enabling
     /// the virtualization.
     pub original_vbar_el2: u64,
-    _phantom: PhantomData<H>,
 }
-
-/// IRQ handler registered by underlying host OS during per-cpu initialization,
-/// for dispatching IRQs to the host OS.
-///
-/// Set `IRQ_HANDLER` as per-cpu variable to avoid the need of `OnceLock`.
-#[percpu::def_percpu]
-pub static IRQ_HANDLER: OnceCell<&(dyn Fn() + Send + Sync)> = OnceCell::new();
 
 unsafe extern "C" {
     fn exception_vector_base_vcpu();
 }
 
-impl<H: AxVCpuHal> AxArchPerCpu for Aarch64PerCpu<H> {
+impl AxArchPerCpu for Aarch64PerCpu {
     fn new(cpu_id: usize) -> AxResult<Self> {
-        // Register IRQ handler for this CPU.
-        let _ = unsafe { IRQ_HANDLER.current_ref_mut_raw() }
-            .set(&|| H::irq_hanlder())
-            .map(|_| {});
-
         Ok(Self {
             cpu_id,
             original_vbar_el2: 0,
-            _phantom: PhantomData,
         })
     }
 
