@@ -1,9 +1,7 @@
-use core::marker::PhantomData;
-
 use aarch64_cpu::registers::*;
 use axaddrspace::{GuestPhysAddr, HostPhysAddr, device::SysRegAddr};
 use axerrno::AxResult;
-use axvcpu::{AxArchVCpu, AxVCpuExitReason, AxVCpuHal};
+use axvcpu::{AxArchVCpu, AxVCpuExitReason};
 
 use crate::TrapFrame;
 use crate::context_frame::GuestSystemRegisters;
