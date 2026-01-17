@@ -302,7 +302,7 @@ impl Aarch64VCpu {
         let result = match exit_reason {
             TrapKind::Synchronous => handle_exception_sync(&mut self.ctx),
             TrapKind::Irq => Ok(AxVCpuExitReason::ExternalInterrupt {
-                vector: axvisor_api::arch::fetch_irq()
+                vector: axvisor_api::arch::fetch_irq(),
             }),
             _ => panic!("Unhandled exception {:?}", exit_reason),
         };
