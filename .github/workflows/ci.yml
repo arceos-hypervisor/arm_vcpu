@@ -44,16 +44,16 @@ jobs:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@nightly
       with:
-        toolchain: nightly-2024-12-25
+        toolchain: nightly-2025-05-20
     - name: Build docs
       continue-on-error: ${{ github.ref != env.default-branch && github.event_name != 'pull_request' }}
       run: |
         cargo doc --no-deps --all-features
-        printf '<meta http-equiv="refresh" content="0;url=%s/index.html">' $(cargo tree | head -1 | cut -d' ' -f1) > target/doc/index.html
+        printf '<meta http-equiv="refresh" content="0;url=%s/index.html">' $(cargo tree | head -1 | cut -d' ' -f1) > target/aarch64-unknown-none-softfloat/doc/index.html
     - name: Deploy to Github Pages
       if: ${{ github.ref == env.default-branch }}
       uses: JamesIves/github-pages-deploy-action@v4
       with:
         single-commit: true
         branch: gh-pages
-        folder: target/doc
+        folder: target/aarch64-unknown-none-softfloat/doc

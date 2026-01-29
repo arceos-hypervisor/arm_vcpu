@@ -1,26 +1,53 @@
-use core::marker::PhantomData;
+use core::{cell::UnsafeCell, fmt::Arguments};
 
 use aarch64_cpu::registers::*;
-use axaddrspace::{GuestPhysAddr, HostPhysAddr, device::SysRegAddr};
+use alloc::collections::btree_map::BTreeMap;
 use axerrno::AxResult;
-use axvcpu::{AxArchVCpu, AxVCpuExitReason, AxVCpuHal};
+use axvm_types::{
+    addr::{GuestPhysAddr, HostPhysAddr},
+    device::SysRegAddr,
+};
 
-use crate::TrapFrame;
 use crate::context_frame::GuestSystemRegisters;
 use crate::exception::{TrapKind, handle_exception_sync};
 use crate::exception_utils::exception_class_value;
+use crate::exit::AxVCpuExitReason;
+use crate::{TrapFrame, inject_interrupt};
 
-#[percpu::def_percpu]
-static HOST_SP_EL0: u64 = 0;
+// #[percpu::def_percpu]
+static HOST_SP_EL0: SpContainer = SpContainer(UnsafeCell::new(BTreeMap::new()));
+
+struct SpContainer(UnsafeCell<BTreeMap<usize, u64>>);
+
+unsafe impl Send for SpContainer {}
+unsafe impl Sync for SpContainer {}
+
+fn current_cpu_id() -> usize {
+    let mpidr = MPIDR_EL1.get() as usize;
+    mpidr & 0xff_ff_ff
+}
+
+pub(crate) unsafe fn init_host_sp_el0() {
+    let cpu_list = super::hal().cpu_list();
+    let host_sp_el0_map = unsafe { &mut *HOST_SP_EL0.0.get() };
+    for cpu_id in cpu_list {
+        host_sp_el0_map.insert(cpu_id, 0);
+    }
+}
 
 /// Save host's `SP_EL0` to the current percpu region.
 unsafe fn save_host_sp_el0() {
-    unsafe { HOST_SP_EL0.write_current_raw(SP_EL0.get()) }
+    unsafe { (&mut *HOST_SP_EL0.0.get()).insert(current_cpu_id(), SP_EL0.get()) };
 }
 
 /// Restore host's `SP_EL0` from the current percpu region.
 unsafe fn restore_host_sp_el0() {
-    SP_EL0.set(unsafe { HOST_SP_EL0.read_current_raw() });
+    SP_EL0.set(unsafe {
+        (&*HOST_SP_EL0.0.get())
+            .get(&current_cpu_id())
+            .copied()
+            .expect("Host SP_EL0 not saved!")
+    });
 }
 
 /// (v)CPU register state that must be saved or restored when entering/exiting a VM or switching
@@ -37,7 +64,7 @@ pub struct VmCpuRegisters {
 /// A virtual CPU within a guest
 #[repr(C)]
 #[derive(Debug)]
-pub struct Aarch64VCpu<H: AxVCpuHal> {
+pub struct Aarch64VCpu {
     // DO NOT modify `guest_regs` and `host_stack_top` and their order unless you do know what you are doing!
     // DO NOT add anything before or between them unless you do know what you are doing!
     ctx: TrapFrame,
@@ -45,7 +72,8 @@ pub struct Aarch64VCpu<H: AxVCpuHal> {
     guest_system_regs: GuestSystemRegisters,
     /// The MPIDR_EL1 value for the vCPU.
     mpidr: u64,
-    _phantom: PhantomData<H>,
+    pub pt_level: usize,
+    pub pa_bits: usize,
 }
 
 /// Configuration for creating a new `Aarch64VCpu`
@@ -69,42 +97,98 @@ pub struct Aarch64VCpuSetupConfig {
     pub passthrough_timer: bool,
 }
 
-impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
-    type CreateConfig = Aarch64VCpuCreateConfig;
-
-    type SetupConfig = Aarch64VCpuSetupConfig;
-
-    fn new(_vm_id: usize, _vcpu_id: usize, config: Self::CreateConfig) -> AxResult<Self> {
+impl Aarch64VCpu {
+    pub fn new(config: Aarch64VCpuCreateConfig) -> AxResult<Self> {
         let mut ctx = TrapFrame::default();
         ctx.set_argument(config.dtb_addr);
+
+        let pa_bits = pa_bits();
+        let pt_level = max_gpt_level(pa_bits);
 
         Ok(Self {
             ctx,
             host_stack_top: 0,
             guest_system_regs: GuestSystemRegisters::default(),
             mpidr: config.mpidr_el1,
-            _phantom: PhantomData,
+            pt_level,
+            pa_bits,
         })
     }
 
-    fn setup(&mut self, config: Self::SetupConfig) -> AxResult {
+    pub fn setup(&mut self, config: Aarch64VCpuSetupConfig) -> AxResult {
         self.init_hv(config);
         Ok(())
     }
 
-    fn set_entry(&mut self, entry: GuestPhysAddr) -> AxResult {
-        debug!("set vcpu entry:{entry:?}");
+    pub fn set_dtb_addr(&mut self, dtb_addr: GuestPhysAddr) -> AxResult {
+        debug!("vCPU{} set vcpu dtb addr:{dtb_addr:?}", self.mpidr);
+        self.ctx.set_argument(dtb_addr.as_usize());
+        Ok(())
+    }
+
+    pub fn set_entry(&mut self, entry: GuestPhysAddr) -> AxResult {
+        debug!("vCPU{} set vcpu entry:{entry:?}", self.mpidr);
         self.set_elr(entry.as_usize());
         Ok(())
     }
 
-    fn set_ept_root(&mut self, ept_root: HostPhysAddr) -> AxResult {
-        debug!("set vcpu ept root:{ept_root:#x}");
+    pub fn set_ept_root(&mut self, ept_root: HostPhysAddr) -> AxResult {
+        debug!("vCPU{} set vcpu ept root:{ept_root:#x}", self.mpidr);
         self.guest_system_regs.vttbr_el2 = ept_root.as_usize() as u64;
         Ok(())
     }
 
-    fn run(&mut self) -> AxResult<AxVCpuExitReason> {
+    pub fn setup_current_cpu(&mut self, vmid: usize) -> AxResult {
+        // Set VMID then invalidate stage-2 TLB for this VMID to avoid stale translations.
+        let vmid_mask: u64 = 0xffff << 48;
+        let mut val = match self.pt_level {
+            4 => VTCR_EL2::SL0::Granule4KBLevel0 + VTCR_EL2::T0SZ.val(64 - 48),
+            _ => VTCR_EL2::SL0::Granule4KBLevel1 + VTCR_EL2::T0SZ.val(64 - 39),
+        };
+
+        val = val
+            + match self.pa_bits {
+                52..=64 => VTCR_EL2::PS::PA_52B_4PB,
+                48..=51 => VTCR_EL2::PS::PA_48B_256TB,
+                44..=47 => VTCR_EL2::PS::PA_44B_16TB,
+                42..=43 => VTCR_EL2::PS::PA_42B_4TB,
+                40..=41 => VTCR_EL2::PS::PA_40B_1TB,
+                36..=39 => VTCR_EL2::PS::PA_36B_64GB,
+                _ => VTCR_EL2::PS::PA_32B_4GB,
+            };
+
+        val = val
+            + VTCR_EL2::TG0::Granule4KB
+            + VTCR_EL2::SH0::Inner
+            + VTCR_EL2::ORGN0::NormalWBRAWA
+            + VTCR_EL2::IRGN0::NormalWBRAWA;
+
+        self.guest_system_regs.vtcr_el2 = val.value;
+        VTCR_EL2.set(self.guest_system_regs.vtcr_el2);
+        debug!(
+            "vCPU {:#x} set pt level: {}, pt bits: {}",
+            self.mpidr, self.pt_level, self.pa_bits
+        );
+
+        let mut vttbr = self.guest_system_regs.vttbr_el2;
+        vttbr = (vttbr & !vmid_mask) | ((vmid as u64 & 0xffff) << 48);
+        self.guest_system_regs.vttbr_el2 = vttbr;
+        VTTBR_EL2.set(vttbr);
+
+        unsafe {
+            core::arch::asm!(
+                "dsb ishst",         // ensure VTTBR write visible before TLB invalidation
+                "tlbi vmalls12e1is", // invalidate stage-2 by VMID (inner-shareable)
+                "dsb ish",           // ensure completion of invalidation
+                "isb",               // sync context
+                options(nostack, preserves_flags)
+            );
+        }
+
+        Ok(())
+    }
+
+    pub fn run(&mut self) -> AxResult<AxVCpuExitReason> {
         // Run guest.
         let exit_reson = unsafe {
             // Save host SP_EL0 to the ctx becase it's used as current task ptr.
@@ -118,31 +202,23 @@ impl<H: AxVCpuHal> axvcpu::AxArchVCpu for Aarch64VCpu<H> {
         self.vmexit_handler(trap_kind)
     }
 
-    fn bind(&mut self) -> AxResult {
-        Ok(())
-    }
-
-    fn unbind(&mut self) -> AxResult {
-        Ok(())
-    }
-
-    fn set_gpr(&mut self, idx: usize, val: usize) {
+    pub fn set_gpr(&mut self, idx: usize, val: usize) {
         self.ctx.set_gpr(idx, val);
     }
 
-    fn inject_interrupt(&mut self, vector: usize) -> AxResult {
-        axvisor_api::arch::hardware_inject_virtual_interrupt(vector as u8);
+    pub fn inject_interrupt(&mut self, vector: usize) -> AxResult {
+        inject_interrupt(vector);
         Ok(())
     }
 
-    fn set_return_value(&mut self, val: usize) {
+    pub fn set_return_value(&mut self, val: usize) {
         // Return value is stored in x0.
         self.ctx.set_argument(val);
     }
 }
 
 // Private function
-impl<H: AxVCpuHal> Aarch64VCpu<H> {
+impl Aarch64VCpu {
     fn init_hv(&mut self, config: Aarch64VCpuSetupConfig) {
         self.ctx.spsr = (SPSR_EL1::M::EL1h
             + SPSR_EL1::I::Masked
@@ -167,60 +243,15 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
         self.guest_system_regs.sctlr_el1 = 0x30C50830;
         self.guest_system_regs.pmcr_el0 = 0;
 
-        // use 3 level ept paging
-        // - 4KiB granule (TG0)
-        // - 39-bit address space (T0_SZ)
-        // - start at level 1 (SL0)
-        #[cfg(not(feature = "4-level-ept"))]
-        {
-            self.guest_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_40B_1TB
-                + VTCR_EL2::TG0::Granule4KB
-                + VTCR_EL2::SH0::Inner
-                + VTCR_EL2::ORGN0::NormalWBRAWA
-                + VTCR_EL2::IRGN0::NormalWBRAWA
-                + VTCR_EL2::SL0.val(0b01)
-                + VTCR_EL2::T0SZ.val(64 - 39))
-            .into();
-        }
+        // self.guest_system_regs.vtcr_el2 = probe_vtcr_support()
+        //     + (VTCR_EL2::TG0::Granule4KB
+        //         + VTCR_EL2::SH0::Inner
+        //         + VTCR_EL2::ORGN0::NormalWBRAWA
+        //         + VTCR_EL2::IRGN0::NormalWBRAWA)
+        //         .value;
 
-        // use 4 level ept paging
-        // - 4KiB granule (TG0)
-        // - 48-bit address space (T0_SZ)
-        // - start at level 0 (SL0)
-        #[cfg(feature = "4-level-ept")]
-        {
-            // read PARange (bits 3:0)
-            let parange = (ID_AA64MMFR0_EL1.get() & 0xF) as u8;
-            // ARM Definition: 0x5 indicates 48 bits PA, 0x4 indicates 44 bits PA, and so on.
-            if parange <= 0x4 {
-                panic!(
-                    "CPU only supports {}-bit PA (< 44), \
-                 cannot enable 4-level EPT paging!",
-                    match parange {
-                        0x0 => 32,
-                        0x1 => 36,
-                        0x2 => 40,
-                        0x3 => 42,
-                        0x4 => 44,
-                        _ => 48,
-                    }
-                );
-            }
-            self.guest_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_48B_256TB
-                + VTCR_EL2::TG0::Granule4KB
-                + VTCR_EL2::SH0::Inner
-                + VTCR_EL2::ORGN0::NormalWBRAWA
-                + VTCR_EL2::IRGN0::NormalWBRAWA
-                + VTCR_EL2::SL0.val(0b10) // 0b10 means start at level 0
-                + VTCR_EL2::T0SZ.val(64 - 48))
-            .into();
-        }
-
-        let mut hcr_el2 = HCR_EL2::VM::Enable
-            + HCR_EL2::RW::EL1IsAarch64
-            + HCR_EL2::FMO::EnableVirtualFIQ
-            + HCR_EL2::TSC::EnableTrapEl1SmcToEl2
-            + HCR_EL2::RW::EL1IsAarch64;
+        let mut hcr_el2 =
+            HCR_EL2::VM::Enable + HCR_EL2::TSC::EnableTrapEl1SmcToEl2 + HCR_EL2::RW::EL1IsAarch64;
 
         if !config.passthrough_interrupt {
             // Set HCR_EL2.IMO will trap IRQs to EL2 while enabling virtual IRQs.
@@ -228,7 +259,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             // We must choose one of the two:
             // - Enable virtual IRQs and trap physical IRQs to EL2.
             // - Disable virtual IRQs and pass through physical IRQs to EL1.
-            hcr_el2 += HCR_EL2::IMO::EnableVirtualIRQ;
+            hcr_el2 += HCR_EL2::IMO::EnableVirtualIRQ + HCR_EL2::FMO::EnableVirtualFIQ;
         }
 
         self.guest_system_regs.hcr_el2 = hcr_el2.into();
@@ -254,7 +285,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
 }
 
 /// Private functions related to vcpu runtime control flow.
-impl<H: AxVCpuHal> Aarch64VCpu<H> {
+impl Aarch64VCpu {
     /// Save host context and run guest.
     ///
     /// When a VM-Exit happens when guest's vCpu is running,
@@ -348,9 +379,7 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
 
         let result = match exit_reason {
             TrapKind::Synchronous => handle_exception_sync(&mut self.ctx),
-            TrapKind::Irq => Ok(AxVCpuExitReason::ExternalInterrupt {
-                vector: H::irq_fetch() as _,
-            }),
+            TrapKind::Irq => Ok(AxVCpuExitReason::ExternalInterrupt),
             _ => panic!("Unhandled exception {:?}", exit_reason),
         };
 
@@ -440,4 +469,55 @@ impl<H: AxVCpuHal> Aarch64VCpu<H> {
             }
         }
     }
+}
+
+pub(crate) fn pa_bits() -> usize {
+    match ID_AA64MMFR0_EL1.read_as_enum(ID_AA64MMFR0_EL1::PARange) {
+        Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_32) => 32,
+        Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_36) => 36,
+        Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_40) => 40,
+        Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_42) => 42,
+        Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_44) => 44,
+        Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_48) => 48,
+        Some(ID_AA64MMFR0_EL1::PARange::Value::Bits_52) => 52,
+        _ => 32,
+    }
+}
+
+#[allow(dead_code)]
+pub(crate) fn current_gpt_level() -> usize {
+    let t0sz = VTCR_EL2.read(VTCR_EL2::T0SZ) as usize;
+    match t0sz {
+        16..=25 => 4,
+        26..=35 => 3,
+        _ => 2,
+    }
+}
+
+pub(crate) fn max_gpt_level(pa_bits: usize) -> usize {
+    match pa_bits {
+        44.. => 4,
+        _ => 3,
+    }
+}
+
+fn probe_vtcr_support() -> u64 {
+    let pa_bits = pa_bits();
+
+    let mut val = match max_gpt_level(pa_bits) {
+        4 => VTCR_EL2::SL0::Granule4KBLevel0 + VTCR_EL2::T0SZ.val(64 - 48),
+        _ => VTCR_EL2::SL0::Granule4KBLevel1 + VTCR_EL2::T0SZ.val(64 - 39),
+    };
+
+    match pa_bits {
+        52..=64 => val += VTCR_EL2::PS::PA_52B_4PB,
+        48..=51 => val += VTCR_EL2::PS::PA_48B_256TB,
+        44..=47 => val += VTCR_EL2::PS::PA_44B_16TB,
+        42..=43 => val += VTCR_EL2::PS::PA_42B_4TB,
+        40..=41 => val += VTCR_EL2::PS::PA_40B_1TB,
+        36..=39 => val += VTCR_EL2::PS::PA_36B_64GB,
+        _ => val += VTCR_EL2::PS::PA_32B_4GB,
+    }
+
+    val.value
 }

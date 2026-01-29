@@ -1,4 +1,3 @@
-use crate::TrapFrame;
 use crate::exception_utils::{
     exception_class, exception_class_value, exception_data_abort_access_is_write,
     exception_data_abort_access_reg, exception_data_abort_access_reg_width,
@@ -7,15 +6,17 @@ use crate::exception_utils::{
     exception_esr, exception_fault_addr, exception_next_instruction_step, exception_sysreg_addr,
     exception_sysreg_direction_write, exception_sysreg_gpr,
 };
+use crate::{TrapFrame, handle_irq};
 
-use aarch64_cpu::registers::{ESR_EL2, HCR_EL2, Readable, SCTLR_EL1, VTCR_EL2, VTTBR_EL2};
-use axaddrspace::{
-    GuestPhysAddr,
-    device::{AccessWidth, SysRegAddr},
+use crate::exit::AxVCpuExitReason;
+use aarch64_cpu::registers::{
+    ESR_EL2, FAR_EL2, HCR_EL2, HPFAR_EL2, Readable, SCTLR_EL1, SPSR_EL2, VTCR_EL2, VTTBR_EL2,
 };
 use axerrno::{AxError, AxResult};
-use axvcpu::AxVCpuExitReason;
-use log::error;
+use axvm_types::{
+    addr::GuestPhysAddr,
+    device::{AccessWidth, SysRegAddr},
+};
 
 numeric_enum_macro::numeric_enum! {
 #[repr(u8)]
@@ -281,9 +282,7 @@ fn handle_smc64_exception(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
 /// which is registered at [`crate::pcpu::IRQ_HANDLER`] during `Aarch64PerCpu::new()`.
 #[unsafe(no_mangle)]
 fn current_el_irq_handler(_tf: &mut TrapFrame) {
-    unsafe { crate::pcpu::IRQ_HANDLER.current_ref_raw() }
-        .get()
-        .unwrap()()
+    handle_irq();
 }
 
 /// Handles synchronous exceptions that occur from the current exception level.
@@ -292,10 +291,16 @@ fn current_el_sync_handler(tf: &mut TrapFrame) {
     let esr = ESR_EL2.extract();
     let ec = ESR_EL2.read(ESR_EL2::EC);
     let iss = ESR_EL2.read(ESR_EL2::ISS);
+    let far = FAR_EL2.get();
+    let hpfar = HPFAR_EL2.get();
+    let spsr_el2 = SPSR_EL2.get();
 
     error!("ESR_EL2: {:#x}", esr.get());
     error!("Exception Class: {ec:#x}");
     error!("Instruction Specific Syndrome: {iss:#x}");
+    error!("FAR_EL2: {far:#x}");
+    error!("HPFAR_EL2: {hpfar:#x}");
+    error!("SPSR_EL2: {spsr_el2:#x}");
 
     panic!(
         "Unhandled synchronous exception from current EL: {:#x?}",
