@@ -1,6 +1,7 @@
-use core::fmt::Arguments;
+use core::{cell::UnsafeCell, fmt::Arguments};
 
 use aarch64_cpu::registers::*;
+use alloc::collections::btree_map::BTreeMap;
 use axerrno::AxResult;
 use axvm_types::{
     addr::{GuestPhysAddr, HostPhysAddr},
@@ -13,17 +14,40 @@ use crate::exception_utils::exception_class_value;
 use crate::exit::AxVCpuExitReason;
 use crate::{TrapFrame, inject_interrupt};
 
-#[percpu::def_percpu]
-static HOST_SP_EL0: u64 = 0;
+// #[percpu::def_percpu]
+static HOST_SP_EL0: SpContainer = SpContainer(UnsafeCell::new(BTreeMap::new()));
+
+struct SpContainer(UnsafeCell<BTreeMap<usize, u64>>);
+
+unsafe impl Send for SpContainer {}
+unsafe impl Sync for SpContainer {}
+
+fn current_cpu_id() -> usize {
+    let mpidr = MPIDR_EL1.get() as usize;
+    mpidr & 0xff_ff_ff
+}
+
+pub(crate) unsafe fn init_host_sp_el0() {
+    let cpu_list = super::hal().cpu_list();
+    let host_sp_el0_map = unsafe { &mut *HOST_SP_EL0.0.get() };
+    for cpu_id in cpu_list {
+        host_sp_el0_map.insert(cpu_id, 0);
+    }
+}
 
 /// Save host's `SP_EL0` to the current percpu region.
 unsafe fn save_host_sp_el0() {
-    unsafe { HOST_SP_EL0.write_current_raw(SP_EL0.get()) }
+    unsafe { (&mut *HOST_SP_EL0.0.get()).insert(current_cpu_id(), SP_EL0.get()) };
 }
 
 /// Restore host's `SP_EL0` from the current percpu region.
 unsafe fn restore_host_sp_el0() {
-    SP_EL0.set(unsafe { HOST_SP_EL0.read_current_raw() });
+    SP_EL0.set(unsafe {
+        (&*HOST_SP_EL0.0.get())
+            .get(&current_cpu_id())
+            .copied()
+            .expect("Host SP_EL0 not saved!")
+    });
 }
 
 /// (v)CPU register state that must be saved or restored when entering/exiting a VM or switching

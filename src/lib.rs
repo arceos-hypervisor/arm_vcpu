@@ -6,6 +6,9 @@
 #[macro_use]
 extern crate log;
 
+#[macro_use]
+extern crate alloc;
+
 mod context_frame;
 #[macro_use]
 mod exception_utils;
@@ -19,6 +22,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 pub use self::pcpu::Aarch64PerCpu;
 pub use self::vcpu::{Aarch64VCpu, Aarch64VCpuCreateConfig, Aarch64VCpuSetupConfig};
+use alloc::vec::Vec;
 pub use axvm_types::addr::*;
 pub use axvm_types::device::*;
 pub use exit::*;
@@ -40,6 +44,8 @@ pub fn has_hardware_support() -> bool {
 pub trait CpuHal {
     fn irq_hanlder(&self);
     fn inject_interrupt(&self, irq: usize);
+    /// Cpu hard id list
+    fn cpu_list(&self) -> Vec<usize>;
 }
 
 struct NopHal;
@@ -49,6 +55,10 @@ impl CpuHal for NopHal {
         unimplemented!()
     }
     fn inject_interrupt(&self, _irq: usize) {
+        unimplemented!()
+    }
+
+    fn cpu_list(&self) -> Vec<usize> {
         unimplemented!()
     }
 }
@@ -79,4 +89,6 @@ pub fn init_hal(hal: &'static dyn CpuHal) {
     } else {
         panic!("arm_vcpu hal has been initialized");
     }
+
+    unsafe { vcpu::init_host_sp_el0() };
 }
