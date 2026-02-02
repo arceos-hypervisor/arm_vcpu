@@ -23,8 +23,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 pub use self::pcpu::Aarch64PerCpu;
 pub use self::vcpu::{Aarch64VCpu, Aarch64VCpuCreateConfig, Aarch64VCpuSetupConfig};
 use alloc::vec::Vec;
-pub use axvm_types::addr::*;
-pub use axvm_types::device::*;
+pub use axvm_types::{addr::*, device::*};
 pub use exit::*;
 
 /// context frame for aarch64
@@ -91,4 +90,14 @@ pub fn init_hal(hal: &'static dyn CpuHal) {
     }
 
     unsafe { vcpu::init_host_sp_el0() };
+}
+
+#[derive(Debug, thiserror::Error, Clone)]
+pub enum VCpuError {
+    #[error("Bad state: {0}")]
+    BadState(&'static str),
+    #[error("Invalid argument: {0}")]
+    InvalidArg(&'static str),
+    #[error("Unsupported operation")]
+    Unsupported,
 }

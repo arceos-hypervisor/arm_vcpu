@@ -1,6 +1,6 @@
 use aarch64_cpu::registers::*;
-use axerrno::{AxResult, ax_err};
-use axvm_types::addr::GuestPhysAddr;
+
+use crate::{GuestPhysAddr, VCpuError};
 
 /// Retrieves the Exception Syndrome Register (ESR) value from EL2.
 ///
@@ -87,7 +87,7 @@ macro_rules! arm_at {
 ///
 /// # Errors
 /// Returns a `BadState` error if the translation is aborted (indicated by the `F` bit in `PAR_EL1`).
-fn translate_far_to_hpfar(far: usize) -> AxResult<usize> {
+fn translate_far_to_hpfar(far: usize) -> Result<usize, VCpuError> {
     /*
      * We have
      *	PAR[PA_Shift - 1 : 12] = PA[PA_Shift - 1 : 12]
@@ -104,7 +104,7 @@ fn translate_far_to_hpfar(far: usize) -> AxResult<usize> {
     let tmp = PAR_EL1.get();
     PAR_EL1.set(par);
     if (tmp & PAR_EL1::F::TranslationAborted.value) != 0 {
-        ax_err!(BadState, "PAR_EL1::F::TranslationAborted value")
+        Err(VCpuError::BadState("PAR_EL1::F::TranslationAborted"))
     } else {
         Ok(par_to_far(tmp) as usize)
     }
@@ -128,7 +128,7 @@ fn translate_far_to_hpfar(far: usize) -> AxResult<usize> {
 /// # Returns
 /// * `AxResult<GuestPhysAddr>` - The guest physical address that caused the exception, wrapped in an `AxResult`.
 #[inline(always)]
-pub fn exception_fault_addr() -> AxResult<GuestPhysAddr> {
+pub fn exception_fault_addr() -> Result<GuestPhysAddr, VCpuError> {
     let far = FAR_EL2.get() as usize;
     let hpfar =
         if (exception_esr() & ESR_ELx_S1PTW) == 0 && exception_data_abort_is_permission_fault() {

@@ -2,17 +2,19 @@ use core::{cell::UnsafeCell, fmt::Arguments};
 
 use aarch64_cpu::registers::*;
 use alloc::collections::btree_map::BTreeMap;
-use axerrno::AxResult;
 use axvm_types::{
     addr::{GuestPhysAddr, HostPhysAddr},
     device::SysRegAddr,
 };
 
-use crate::context_frame::GuestSystemRegisters;
-use crate::exception::{TrapKind, handle_exception_sync};
-use crate::exception_utils::exception_class_value;
-use crate::exit::AxVCpuExitReason;
-use crate::{TrapFrame, inject_interrupt};
+use crate::{
+    TrapFrame, VCpuError,
+    context_frame::GuestSystemRegisters,
+    exception::{TrapKind, handle_exception_sync},
+    exception_utils::exception_class_value,
+    exit::AxVCpuExitReason,
+    inject_interrupt,
+};
 
 // #[percpu::def_percpu]
 static HOST_SP_EL0: SpContainer = SpContainer(UnsafeCell::new(BTreeMap::new()));
@@ -98,7 +100,7 @@ pub struct Aarch64VCpuSetupConfig {
 }
 
 impl Aarch64VCpu {
-    pub fn new(config: Aarch64VCpuCreateConfig) -> AxResult<Self> {
+    pub fn new(config: Aarch64VCpuCreateConfig) -> Result<Self, VCpuError> {
         let mut ctx = TrapFrame::default();
         ctx.set_argument(config.dtb_addr);
 
@@ -115,30 +117,30 @@ impl Aarch64VCpu {
         })
     }
 
-    pub fn setup(&mut self, config: Aarch64VCpuSetupConfig) -> AxResult {
+    pub fn setup(&mut self, config: Aarch64VCpuSetupConfig) -> Result<(), VCpuError> {
         self.init_hv(config);
         Ok(())
     }
 
-    pub fn set_dtb_addr(&mut self, dtb_addr: GuestPhysAddr) -> AxResult {
+    pub fn set_dtb_addr(&mut self, dtb_addr: GuestPhysAddr) -> Result<(), VCpuError> {
         debug!("vCPU{} set vcpu dtb addr:{dtb_addr:?}", self.mpidr);
         self.ctx.set_argument(dtb_addr.as_usize());
         Ok(())
     }
 
-    pub fn set_entry(&mut self, entry: GuestPhysAddr) -> AxResult {
+    pub fn set_entry(&mut self, entry: GuestPhysAddr) -> Result<(), VCpuError> {
         debug!("vCPU{} set vcpu entry:{entry:?}", self.mpidr);
         self.set_elr(entry.as_usize());
         Ok(())
     }
 
-    pub fn set_ept_root(&mut self, ept_root: HostPhysAddr) -> AxResult {
+    pub fn set_ept_root(&mut self, ept_root: HostPhysAddr) -> Result<(), VCpuError> {
         debug!("vCPU{} set vcpu ept root:{ept_root:#x}", self.mpidr);
         self.guest_system_regs.vttbr_el2 = ept_root.as_usize() as u64;
         Ok(())
     }
 
-    pub fn setup_current_cpu(&mut self, vmid: usize) -> AxResult {
+    pub fn setup_current_cpu(&mut self, vmid: usize) -> Result<(), VCpuError> {
         // Set VMID then invalidate stage-2 TLB for this VMID to avoid stale translations.
         let vmid_mask: u64 = 0xffff << 48;
         let mut val = match self.pt_level {
@@ -188,7 +190,7 @@ impl Aarch64VCpu {
         Ok(())
     }
 
-    pub fn run(&mut self) -> AxResult<AxVCpuExitReason> {
+    pub fn run(&mut self) -> Result<AxVCpuExitReason, VCpuError> {
         // Run guest.
         let exit_reson = unsafe {
             // Save host SP_EL0 to the ctx becase it's used as current task ptr.
@@ -206,7 +208,7 @@ impl Aarch64VCpu {
         self.ctx.set_gpr(idx, val);
     }
 
-    pub fn inject_interrupt(&mut self, vector: usize) -> AxResult {
+    pub fn inject_interrupt(&mut self, vector: usize) -> Result<(), VCpuError> {
         inject_interrupt(vector);
         Ok(())
     }
@@ -357,7 +359,7 @@ impl Aarch64VCpu {
     /// - [`AxVCpuExitReason`]: a wrappered VM-Exit reason needed to be handled by the hypervisor.
     ///
     /// This function may panic for unhandled exceptions.
-    fn vmexit_handler(&mut self, exit_reason: TrapKind) -> AxResult<AxVCpuExitReason> {
+    fn vmexit_handler(&mut self, exit_reason: TrapKind) -> Result<AxVCpuExitReason, VCpuError> {
         trace!(
             "Aarch64VCpu vmexit_handler() esr:{:#x} ctx:{:#x?}",
             exception_class_value(),
@@ -415,7 +417,7 @@ impl Aarch64VCpu {
         write: bool,
         value: u64,
         reg: usize,
-    ) -> AxResult<Option<AxVCpuExitReason>> {
+    ) -> Result<Option<AxVCpuExitReason>, VCpuError> {
         const SYSREG_ICC_SGI1R_EL1: SysRegAddr = SysRegAddr::new(0x3A_3016); // ICC_SGI1R_EL1
 
         match (addr, write) {

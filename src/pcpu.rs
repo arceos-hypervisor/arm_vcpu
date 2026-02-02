@@ -1,5 +1,6 @@
 use aarch64_cpu::registers::*;
-use axerrno::AxResult;
+
+use crate::VCpuError;
 
 /// Per-CPU data. A pointer to this struct is loaded into TP when a CPU starts. This structure
 #[repr(C)]
@@ -46,7 +47,7 @@ impl Aarch64PerCpu {
         // }
     }
 
-    pub fn hardware_disable(&mut self) -> AxResult {
+    pub fn hardware_disable(&mut self) -> Result<(), VCpuError> {
         // Reset `VBAR_EL2` into previous value.
         // Safety:
         // Todo: take care of `preemption`

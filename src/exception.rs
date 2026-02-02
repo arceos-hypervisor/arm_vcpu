@@ -6,13 +6,12 @@ use crate::exception_utils::{
     exception_esr, exception_fault_addr, exception_next_instruction_step, exception_sysreg_addr,
     exception_sysreg_direction_write, exception_sysreg_gpr,
 };
-use crate::{TrapFrame, handle_irq};
+use crate::{TrapFrame, VCpuError, handle_irq};
 
 use crate::exit::AxVCpuExitReason;
 use aarch64_cpu::registers::{
     ESR_EL2, FAR_EL2, HCR_EL2, HPFAR_EL2, Readable, SCTLR_EL1, SPSR_EL2, VTCR_EL2, VTTBR_EL2,
 };
-use axerrno::{AxError, AxResult};
 use axvm_types::{
     addr::GuestPhysAddr,
     device::{AccessWidth, SysRegAddr},
@@ -72,7 +71,7 @@ core::arch::global_asm!(
 /// details about the exception including the instruction pointer, faulting address, exception
 /// syndrome register (ESR), and system control registers.
 ///
-pub fn handle_exception_sync(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
+pub fn handle_exception_sync(ctx: &mut TrapFrame) -> Result<AxVCpuExitReason, VCpuError> {
     match exception_class() {
         Some(ESR_EL2::EC::Value::DataAbortLowerEL) => {
             let elr = ctx.exception_pc();
@@ -128,7 +127,7 @@ pub fn handle_exception_sync(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> 
     }
 }
 
-fn handle_data_abort(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
+fn handle_data_abort(context_frame: &mut TrapFrame) -> Result<AxVCpuExitReason, VCpuError> {
     let addr = exception_fault_addr()?;
     let access_width = exception_data_abort_access_width();
     let is_write = exception_data_abort_access_is_write();
@@ -145,12 +144,12 @@ fn handle_data_abort(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason
 
     let width = match AccessWidth::try_from(access_width) {
         Ok(access_width) => access_width,
-        Err(_) => return Err(AxError::InvalidInput),
+        Err(_) => return Err(VCpuError::InvalidArg("access width invalid")),
     };
 
     let reg_width = match AccessWidth::try_from(reg_width) {
         Ok(reg_width) => reg_width,
-        Err(_) => return Err(AxError::InvalidInput),
+        Err(_) => return Err(VCpuError::InvalidArg("reg width invalid")),
     };
 
     if !exception_data_abort_handleable() {
@@ -163,7 +162,7 @@ fn handle_data_abort(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason
 
     if !exception_data_abort_is_translate_fault() {
         if exception_data_abort_is_permission_fault() {
-            return Err(AxError::Unsupported);
+            return Err(VCpuError::Unsupported);
         } else {
             panic!("Core data abort is not translate fault {:#x}", addr,);
         }
@@ -196,7 +195,7 @@ fn handle_data_abort(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason
 /// # Returns
 /// * `AxResult<AxVCpuExitReason>` - An `AxResult` containing an `AxVCpuExitReason` indicating
 ///   whether the operation was a read or write and the relevant details.
-fn handle_system_register(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
+fn handle_system_register(context_frame: &mut TrapFrame) -> Result<AxVCpuExitReason, VCpuError> {
     let iss = ESR_EL2.read(ESR_EL2::ISS);
 
     let addr = exception_sysreg_addr(iss.try_into().unwrap());
@@ -224,7 +223,7 @@ fn handle_system_register(context_frame: &mut TrapFrame) -> AxResult<AxVCpuExitR
 /// calling convention is used) is a psci call. This function handles them all.
 ///
 /// Returns `None` if the HVC is not a psci call.
-fn handle_psci_call(ctx: &mut TrapFrame) -> Option<AxResult<AxVCpuExitReason>> {
+fn handle_psci_call(ctx: &mut TrapFrame) -> Option<Result<AxVCpuExitReason, VCpuError>> {
     const PSCI_FN_RANGE_32: core::ops::RangeInclusive<u64> = 0x8400_0000..=0x8400_001F;
     const PSCI_FN_RANGE_64: core::ops::RangeInclusive<u64> = 0xC400_0000..=0xC400_001F;
 
@@ -264,7 +263,7 @@ fn handle_psci_call(ctx: &mut TrapFrame) -> Option<AxResult<AxVCpuExitReason>> {
 ///
 /// This function will judge if the SMC call is a PSCI call, if so, it will handle it as a PSCI call.
 /// Otherwise, it will forward the SMC call to the ATF directly.
-fn handle_smc64_exception(ctx: &mut TrapFrame) -> AxResult<AxVCpuExitReason> {
+fn handle_smc64_exception(ctx: &mut TrapFrame) -> Result<AxVCpuExitReason, VCpuError> {
     // Is this a psci call?
     if let Some(result) = handle_psci_call(ctx) {
         result

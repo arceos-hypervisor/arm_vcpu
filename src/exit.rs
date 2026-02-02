@@ -1,7 +1,4 @@
-use axvm_types::{
-    addr::GuestPhysAddr,
-    device::{AccessWidth, SysRegAddr},
-};
+use crate::{AccessWidth, GuestPhysAddr, SysRegAddr};
 
 /// Reasons for VM-Exits returned by [AxArchVCpu::run].
 ///
