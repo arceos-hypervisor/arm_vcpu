@@ -59,4 +59,4 @@ if has_hardware_support() {
 
 ## License
 
-Arm_vcpu is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for details.
+Arm_vcpu is licensed under the Apache License, Version 2.0. See the [LICENSE](./LICENSE) file for details.
