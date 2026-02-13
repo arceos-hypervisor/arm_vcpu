@@ -15,5 +15,3 @@ on:
 jobs:
   test:
     uses: arceos-hypervisor/axci/.github/workflows/test.yml@main
-    secrets:
-      token: ${{ secrets.ACCESS_TOKEN }}
