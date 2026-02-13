@@ -57,6 +57,28 @@ if has_hardware_support() {
 - **Architecture**: AArch64 (ARMv8-A or later)
 - **Privilege Level**: EL2 (Hypervisor mode) required for full functionality
 
+## Testing
+
+This crate uses a shared testing framework for integration tests. See [hypervisor-test-framework](https://github.com/arceos-hypervisor/hypervisor-test-framework) for details.
+
+### Quick Test
+
+```bash
+# Run all integration tests
+make test
+
+# Test with specific target
+make test-axvisor   # Test with axvisor
+make test-starry    # Test with StarryOS
+
+# Local CI checks
+make ci-local
+```
+
+### Test Configuration
+
+See [`.test-config.json`](./.test-config.json) for test target configuration.
+
 ## License
 
 Arm_vcpu is licensed under the Apache License, Version 2.0. See the [LICENSE](./LICENSE) file for details.
