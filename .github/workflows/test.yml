@@ -5,26 +5,12 @@ name: Test
 
 on:
   push:
-    branches: [master, main, dev]
-    tags-ignore: ['**']
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
   pull_request:
-  workflow_dispatch:
-    inputs:
-      test_targets:
-        description: '测试目标 (all, axvisor, starry)'
-        required: false
-        default: 'all'
-      skip_build:
-        description: '跳过构建'
-        required: false
-        default: 'false'
-        type: boolean
 
 jobs:
   test:
     uses: arceos-hypervisor/axci/.github/workflows/test.yml@main
-    with:
-      component_repo: ${{ github.repository }}
-      component_ref: ${{ github.ref }}
-      test_targets: ${{ inputs.test_targets || 'all' }}
-      skip_build: ${{ inputs.skip_build || false }}

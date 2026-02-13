@@ -5,14 +5,10 @@ name: Check
 
 on:
   push:
-    branches:
-      - '**'
-    tags-ignore:
-      - '**'
+    branches: ['**']
+    tags-ignore: ['**']
   pull_request:
 
 jobs:
   check:
     uses: arceos-hypervisor/axci/.github/workflows/check.yml@main
-    with:
-      all_features: true
