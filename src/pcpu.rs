@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use core::{cell::OnceCell, marker::PhantomData, mem};
+use core::mem;
 
 use aarch64_cpu::registers::*;
 use axerrno::AxResult;
-use axvcpu::{AxArchPerCpu, AxVCpuHal};
+use axvcpu::AxArchPerCpu;
 
 /// Per-CPU data. A pointer to this struct is loaded into TP when a CPU starts. This structure
 #[repr(C)]
